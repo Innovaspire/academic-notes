@@ -35,6 +35,15 @@ export class PluginSettingTab {
   containerEl = document.createElement('div');
   constructor(..._args: unknown[]) {}
 }
+export class Modal {
+  modalEl = document.body.createDiv({cls:'modal'});
+  titleEl = Object.assign(this.modalEl.createEl('h2'), { setText(text:string) { this.textContent=text; } });
+  contentEl = this.modalEl.createDiv({cls:'modal-content'});
+  constructor(public app: any) {}
+  onOpen() {}
+  open() { this.onOpen(); }
+  close() { this.modalEl.remove(); }
+}
 export class Setting {
   settingEl: HTMLElement; nameEl: HTMLElement; descEl: HTMLElement;
   constructor(parent: HTMLElement) {

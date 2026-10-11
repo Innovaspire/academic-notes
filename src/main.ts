@@ -25,6 +25,8 @@ import { openDiagramEditor, diagramProcessor } from './ui/diagram-modal';
 import { createParagraphLayoutController, hasParagraphSelection, restoreParagraphs } from './typography/dom';
 import { editorFragment } from './rendering/editor-dom';
 import { LayoutRecorder, traceLayout, type LayoutReport } from './diagnostics/layout';
+import { visibleTypographyStatus } from './typography/status';
+import { ReferenceAuditModal, CatalogModal, ProfileModal, refreshCatalog } from './ui/workspace-tools';
 import diagramCss from './styles/diagrams.css';
 import typographyCss from './styles/typography.css';
 import calloutCss from './styles/callouts.css';
@@ -51,6 +53,13 @@ export default class AcademicNotes extends Plugin {
     rerun = false;
     indexPromise: Promise<void> | undefined;
     indexTimer: number | undefined;
+    indexReady = false;
+    previewPaused = false;
+    indexMetrics = { files: 0, parsed: 0, reused: 0, read: 0, refreshed: 0, durationMs: 0, graphRebuilt: false };
+    private graphKey = '';
+    private renderKey = '';
+    private renderStates = new Map<string, { source: string; labels: string }>();
+    private readerPaths = new Map<() => void, string>();
     appearanceBefore: { palette: string | null; profile?: string | null; classes: Record<string, boolean>; variables: Record<string, [string, string]> };
     editorViews = new Set<EditorView>();
     readers = new Set<() => void>();
@@ -73,6 +82,7 @@ export default class AcademicNotes extends Plugin {
         this.graph = null;
         this.revision = 0;
         this.active = true;
+        this.indexReady = false;
         this.busy = false;
         this.indexRunning = false;
         this.appearanceBefore = { palette: document.body.getAttribute('data-an-palette'), profile: document.body.getAttribute('data-an-profile'), classes: Object.fromEntries(['an-active', 'an-prose-indent', 'phb-neutral-body', 'phb-no-motif'].map(c => [c, document.body.classList.contains(c)])), variables: Object.fromEntries(appearanceVariables.map(k => [k, [document.body.style.getPropertyValue(k), document.body.style.getPropertyPriority(k)]])) };
@@ -106,6 +116,11 @@ export default class AcademicNotes extends Plugin {
         this.addCommand({ id: 'export-current', name: t("导出当前笔记为 HTML 快照"), callback: () => this.exportActive(false, false) });
         this.addCommand({ id: 'export-book', name: t("按 phb-book 清单导出 HTML 快照"), callback: () => this.exportActive(true, false) });
         this.addCommand({ id: 'diagnostics', name: t("检查插件状态与导出环境"), callback: () => this.diagnostics() });
+        this.addCommand({ id: 'check-references', name: t('检查学术引用'), callback: () => new ReferenceAuditModal(this).open() });
+        this.addCommand({ id: 'create-academic-index', name: t('生成学术索引笔记'), callback: () => new CatalogModal(this).open() });
+        this.addCommand({ id: 'update-academic-index', name: t('更新当前学术索引笔记'), callback: () => { void refreshCatalog(this).catch(error => this.fail(t('更新当前学术索引笔记'), error)); } });
+        this.addCommand({ id: 'share-style-profile', name: t('分享配色与环境方案'), callback: () => new ProfileModal(this).open() });
+        this.addCommand({ id: 'toggle-preview-pause', name: t('暂停或恢复实时预览增强（本次会话）'), callback: () => this.togglePreviewPause() });
         this.addCommand({ id: 'start-layout-diagnostics', name: t('开始记录排版与滚动诊断（90 秒）'), callback: () => { void this.startLayoutDiagnostics().catch(e => this.fail(t('排版与滚动诊断'), e)); } });
         this.addCommand({ id: 'stop-layout-diagnostics', name: t('停止并保存排版与滚动诊断'), callback: () => { void this.stopLayoutDiagnostics().catch(e => this.fail(t('排版与滚动诊断'), e)); } });
         this.addCommand({ id: 'refresh', name: t("重建定理公式索引并刷新引用"), callback: () => { this.parsed.clear(); this.rebuild().then(() => new Notice(t("索引已重建。"))).catch(e => this.fail(t("重建索引"), e)); } });
@@ -145,9 +160,9 @@ export default class AcademicNotes extends Plugin {
             this.registerEditorSuggest(new ReferenceSuggest(this));
         this.registerEvent(this.app.metadataCache.on('changed', file => { if (file && !this.included(file)) return;
             if (file) this.dirty.set(file.path, true); this.scheduleIndex(); }));
-        this.registerEvent(this.app.vault.on('create', file => { if (!(file instanceof TFile) || this.included(file)) this.scheduleIndex(); }));
-        this.registerEvent(this.app.vault.on('delete', () => this.scheduleIndex()));
-        this.registerEvent(this.app.vault.on('rename', () => this.scheduleIndex()));
+        this.registerEvent(this.app.vault.on('create', file => { if (file instanceof TFile && file.extension === 'md' && this.included(file)) this.scheduleIndex(); }));
+        this.registerEvent(this.app.vault.on('delete', file => { if (file instanceof TFile && file.extension === 'md') this.scheduleIndex(); }));
+        this.registerEvent(this.app.vault.on('rename', file => { if (!(file instanceof TFile) || file.extension === 'md') { this.graphKey = ''; this.scheduleIndex(); } }));
         this.registerEvent(this.app.workspace.on('editor-change', (editor, info) => {
             if (info?.file) {
                 this.dirty.set(info.file.path, true);
@@ -160,8 +175,8 @@ export default class AcademicNotes extends Plugin {
         this.themeObserver = new MutationObserver(() => this.applyAppearance());
         this.themeObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
         this.register(() => this.themeObserver.disconnect());
-        this.app.workspace.onLayoutReady(() => { if (this.active)
-            this.rebuild().catch(e => this.fail(t("建立索引"), e)); });
+        this.app.workspace.onLayoutReady(() => { if (this.active) {
+            this.indexReady = true; this.rebuild().catch(e => this.fail(t("建立索引"), e)); } });
     }
     onunload() {
         this.active = false;
@@ -172,6 +187,7 @@ export default class AcademicNotes extends Plugin {
         for (const unload of this.readerUnloads) unload();
         this.readerUnloads.clear();
         this.readers.clear();
+        this.readerPaths.clear();
         for (const layout of this.paragraphLayouts) layout.dispose();
         this.paragraphLayouts.clear();
         for (const job of this.pdfJobs)
@@ -197,6 +213,11 @@ export default class AcademicNotes extends Plugin {
         this.errors.shift(); console.error('[Academic Notes]', where, error); }
     fail(where: string, error: unknown) { this.recordError(where, error); new Notice(t('{0}失败：{1}\n可运行“检查插件状态与导出环境”。', where, error instanceof Error ? error.message : String(error)), 13000); }
     async saveSettings() { await this.saveData(this.settings); this.applyAppearance(); for (const layout of this.paragraphLayouts) layout.refresh(); this.scheduleIndex(); }
+    togglePreviewPause() {
+        this.previewPaused = !this.previewPaused;
+        for (const view of this.editorViews) { try { view.dispatch({ effects: this.refreshEffect.of(++this.revision) }); } catch (error) { this.recordError(t('刷新编辑器'), error); } }
+        new Notice(t(this.previewPaused ? '已暂停本次会话的实时预览增强；阅读与导出不受影响。' : '已恢复实时预览增强。'));
+    }
     applyAppearance() {
         if (!this.active)
             return;
@@ -218,7 +239,7 @@ export default class AcademicNotes extends Plugin {
             else if (b.style.getPropertyValue(key)) b.style.removeProperty(key);
         }
     }
-    scheduleIndex() { if (!this.active)
+    scheduleIndex() { if (!this.active || !this.indexReady)
         return; window.clearTimeout(this.indexTimer); this.indexTimer = window.setTimeout(() => { void this.rebuild().catch(e => this.fail(t("更新索引"), e)); }, Math.max(150, this.settings.indexDelay || 450)); }
     included(file: TFile) {
         const path = file.path;
@@ -228,14 +249,22 @@ export default class AcademicNotes extends Plugin {
         return !excluded.some(p => path === p || path.startsWith(p + '/'));
     }
     resolver(name: string, here: string) { return this.app.metadataCache.getFirstLinkpathDest(name, here)?.path || null; }
-    async rebuild() {
+    async rebuild(): Promise<void> {
+        window.clearTimeout(this.indexTimer);
         if (this.indexRunning) {
             this.rerun = true;
-            return this.indexPromise;
+            await this.indexPromise;
+            return this.rebuild();
         }
         this.indexRunning = true;
         this.indexPromise = (async () => {
+            const started = performance.now(), dirty = this.dirty; this.dirty = new Map();
+            const metrics = { files: 0, parsed: 0, reused: 0, read: 0, refreshed: 0, durationMs: 0, graphRebuilt: false };
+            const graphKey = JSON.stringify(Object.keys(Engine.DEFAULTS).map(key => this.settings[key as keyof AcademicSettingsData]));
+            const renderKey = JSON.stringify([graphKey, this.settings.livePreview, this.settings.kpReading, this.settings.kpLivePreview, this.settings.paragraphIndent, this.previewPaused]);
+            let changed = !this.graph || graphKey !== this.graphKey;
             const files = this.app.vault.getMarkdownFiles().filter(f => this.included(f)), notes: ParsedNote[] = [];
+            metrics.files = files.length;
             // Open buffers win over a disk read: numbering does not force a save.
             const open = new Map<string, string>();
             for (const leaf of this.app.workspace.getLeavesOfType('markdown')) {
@@ -243,13 +272,18 @@ export default class AcademicNotes extends Plugin {
                     open.set(leaf.view.file.path, leaf.view.editor.getValue());
             }
             for (let i = 0; i < files.length; i++) {
+                if (!this.active) return;
                 const f = files[i], cache = this.app.metadataCache.getFileCache(f) || {};
-                const old = this.parsed.get(f.path), fromEditor = open.has(f.path);
-                const text = fromEditor ? open.get(f.path)! : (old && old._mtime === f.stat.mtime && !old._fromEditor && !this.dirty.has(f.path) ? old.source : await this.app.vault.cachedRead(f));
-                let n = old?.source === text && old._environments === this.settings.customEnvironments && !this.dirty.has(f.path) ? old : Engine.parse(f.path, text, cache, this.settings);
+                const old = this.parsed.get(f.path), fromEditor = open.has(f.path), blocks = JSON.stringify(cache.blocks || {});
+                let text: string;
+                if (fromEditor) text = open.get(f.path)!;
+                else if (old && old._mtime === f.stat.mtime && !old._fromEditor && !dirty.has(f.path)) text = old.source;
+                else { text = await this.app.vault.cachedRead(f); metrics.read++; }
+                const n = old?.source === text && old._environments === this.settings.customEnvironments && old._blocks === blocks ? old : Engine.parse(f.path, text, cache, this.settings);
+                if (n === old) metrics.reused++; else { metrics.parsed++; changed = true; }
+                n._blocks = blocks;
                 n._mtime = f.stat.mtime;
                 n._fromEditor = fromEditor;
-                this.dirty.delete(f.path);
                 this.parsed.set(f.path, n);
                 notes.push(n);
                 if (i % 40 === 39)
@@ -259,19 +293,30 @@ export default class AcademicNotes extends Plugin {
                 return;
             const paths = new Set(files.map(f => f.path));
             for (const p of this.parsed.keys())
-                if (!paths.has(p))
-                    this.parsed.delete(p);
-            this.graph = Engine.graph(notes, this.settings, (n, h) => this.resolver(n, h));
+                if (!paths.has(p)) { this.parsed.delete(p); changed = true; this.renderStates.delete(p); }
+            if (changed) { this.graph = Engine.graph(notes, this.settings, (n, h) => this.resolver(n, h)); metrics.graphRebuilt = true; }
+            const affected = new Set<string>(), allViews = renderKey !== this.renderKey;
+            for (const note of notes) {
+                const labels = JSON.stringify([note.records.map(r => [r.key, r.id, r.number, r.referenced]), note.refs.map(r => [r.targetPath, r.target && Engine.refText(r.target, this.settings)])]);
+                const previous = this.renderStates.get(note.path);
+                if (allViews || !previous || previous.source !== note.source || previous.labels !== labels) affected.add(note.path);
+                this.renderStates.set(note.path, { source: note.source, labels });
+            }
+            this.graphKey = graphKey; this.renderKey = renderKey;
+            if (!changed && !allViews) { metrics.durationMs = Math.round(performance.now() - started); this.indexMetrics = metrics; return; }
             this.revision++;
             for (const refresh of this.readers) {
+                const path = this.readerPaths.get(refresh); if (path && !affected.has(path)) continue;
                 try {
-                    refresh();
+                    refresh(); metrics.refreshed++;
                 }
                 catch (e) {
                     this.recordError(t("刷新阅读片段"), e);
                 }
             }
             for (const view of this.editorViews) {
+                const path = view.state.field(Obs.editorInfoField, false)?.file?.path;
+                if (path && !affected.has(path)) continue;
                 try {
                     view.dispatch({ effects: this.refreshEffect.of(this.revision) });
                 }
@@ -279,13 +324,14 @@ export default class AcademicNotes extends Plugin {
                     this.recordError(t("刷新编辑器"), e);
                 }
             }
+            metrics.durationMs = Math.round(performance.now() - started); this.indexMetrics = metrics;
         })();
         try {
             await this.indexPromise;
         }
         finally {
             this.indexRunning = false;
-            if (this.rerun) {
+            if (this.rerun || this.dirty.size) {
                 this.rerun = false;
                 this.scheduleIndex();
             }
@@ -325,6 +371,7 @@ export default class AcademicNotes extends Plugin {
             onload() {
                 this.owner.readerUnloads.add(this.unloadReader);
                 this.owner.readers.add(refresh);
+                this.owner.readerPaths.set(refresh, ctx.sourcePath);
                 refresh();
                 this.resumeSelection = () => { if (selectionDeferred && !hasParagraphSelection(el)) refresh(); };
                 el.ownerDocument.addEventListener('selectionchange', this.resumeSelection);
@@ -346,7 +393,7 @@ export default class AcademicNotes extends Plugin {
                 el.addEventListener('click', this.follow, true);
                 el.addEventListener('keydown', this.follow, true);
             }
-            onunload() { this.owner.readerUnloads.delete(this.unloadReader); this.owner.readers.delete(refresh); if (layout) { layout.dispose(); this.owner.paragraphLayouts.delete(layout); } el.ownerDocument.removeEventListener('selectionchange', this.resumeSelection); el.removeEventListener('click', this.follow, true); el.removeEventListener('keydown', this.follow, true); }
+            onunload() { this.owner.readerUnloads.delete(this.unloadReader); this.owner.readers.delete(refresh); this.owner.readerPaths.delete(refresh); if (layout) { layout.dispose(); this.owner.paragraphLayouts.delete(layout); } el.ownerDocument.removeEventListener('selectionchange', this.resumeSelection); el.removeEventListener('click', this.follow, true); el.removeEventListener('keydown', this.follow, true); }
         }
         ctx.addChild(new Reader(el, this));
         for (const p of allNodes(el, 'p'))
@@ -426,8 +473,8 @@ export default class AcademicNotes extends Plugin {
         if (!await this.app.vault.adapter.exists(p))
             await this.app.vault.adapter.mkdir(p);
     } }
-    async resolveSelection(isBook: boolean): Promise<ExportSelection> {
-        const file = this.app.workspace.getActiveFile();
+    async resolveSelection(isBook: boolean, sourceFile?: TFile): Promise<ExportSelection> {
+        const file = sourceFile || this.app.workspace.getActiveFile();
         if (!(file instanceof TFile) || file.extension !== 'md')
             throw new Error(t("请先打开一篇 Markdown 笔记。"));
         const fm: Record<string, unknown> = this.app.metadataCache.getFileCache(file)?.frontmatter || {};
@@ -866,9 +913,14 @@ export default class AcademicNotes extends Plugin {
         const diagnosticView = this.app.workspace.getActiveViewOfType(MarkdownView);
         const result = { plugin: this.manifest.name, version: this.manifest.version, indexedFiles: this.graph?.notes.size || 0,
             warnings: this.graph?.warnings || [], errors: this.errors.slice(), pdf: pdfAvailability(), lastPdfExport: this.lastPdfExport || { status: 'not-run-this-session' },
+            indexPerformance: this.indexMetrics, previewPaused: this.previewPaused,
+            typography: diagnosticView ? visibleTypographyStatus(diagnosticView.containerEl, { reading: this.settings.kpReading, live: this.settings.kpLivePreview, paused: this.previewPaused }) : [],
             layoutDiagnostics: { running: !!this.layoutDiagnostics?.running, output: this.layoutDiagnosticPath || null } };
         const modal = new Modal(this.app);
         modal.titleEl.setText(t("Academic Notes 诊断"));
+        modal.contentEl.createEl('p', { text: t('排版状态：optimized = KP 已生效；editing / selection = 保留原生编辑或选区；unsupported-content / unsupported-style = 内容或样式不支持；limit = 达到处理上限；cannot-fit = 无法安全排满；not-run = 尚未处理；disabled / paused = 已关闭或临时暂停。') });
+        new Setting(modal.contentEl).setName(t('实时预览增强')).setDesc(t('遇到编辑或滚动异常时，可临时暂停插件的编辑视图增强；不修改已保存的设置。'))
+            .addButton(b => b.setButtonText(t(this.previewPaused ? '恢复增强' : '临时暂停')).onClick(() => { this.togglePreviewPause(); modal.close(); }));
         const pre = modal.contentEl.createEl('pre', { text: JSON.stringify(result, null, 2) });
         pre.classList.add('an-diagnostics');
         new Setting(modal.contentEl).setName(t('排版与滚动诊断')).setDesc(t('仅记录尺寸、样式和事件计数，不记录笔记文字、公式源码或文件名。90 秒后自动停止，每 15 秒保存到库内导出目录。'))

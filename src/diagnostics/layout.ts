@@ -1,4 +1,5 @@
 /** Opt-in local geometry/event recording. No source text, paths, IDs or HTML. */
+import { paragraphStatus } from '../typography/status';
 type TraceCode = 'reading.editor-skip' | 'reading.render' | 'live.paint' | 'live.native-skip' | 'live.layout' | 'kp.layout' | 'kp.fit';
 const active = new WeakMap<Document, LayoutRecorder>();
 export function traceLayout(root: HTMLElement, code: TraceCode, values: Record<string, number | boolean> = {}) { active.get(root.ownerDocument)?.trace(root, code, values); }
@@ -34,7 +35,7 @@ function paragraph(p: HTMLElement) {
         else if (node.nodeType === 1) { const el = node as HTMLElement; if (el.matches('.math,mjx-container,svg')) nativeRects.push(relative(el.getBoundingClientRect(), box)); else for (const child of el.childNodes) { if (visited > 300) break; walk(child); } }
     };
     if (!rows.length) walk(p);
-    return { geometry: geometry(p), css: css(p), optimized: p.dataset.anKp === '1', optimizedLineCount: rows.length,
+    return { geometry: geometry(p), css: css(p), optimized: p.dataset.anKp === '1', status: paragraphStatus(p), optimizedLineCount: rows.length,
         characters: p.textContent?.length || 0, explicitBreaks: p.querySelectorAll('br').length, contentEditable: p.isContentEditable,
         editableDescendants: !!p.querySelector('[contenteditable="true"],[contenteditable="plaintext-only"]'),
         inlineMath: [...p.querySelectorAll<HTMLElement>('.math,mjx-container')].slice(0, 8).map(el => { const s = css(el); return { ...relative(el.getBoundingClientRect(), box), css: { font: s.font, display: s.display, position: s.position } }; }),

@@ -1,4 +1,5 @@
 import { renderEnvironmentSettings } from './environment-settings';
+import { ReferenceAuditModal, CatalogModal, ProfileModal } from './workspace-tools';
 import { t } from '../i18n';
 import Engine from '../indexing/engine';
 import { MOTIFS, motifMask, titleInk, type AppearanceEntry } from '../rendering/custom-appearance';
@@ -46,6 +47,7 @@ class AcademicSettings extends PluginSettingTab {
             }
         };
         if (this.section === 'environment') {
+            new Setting(panel).setName(t('分享配色与环境方案')).addButton(button => button.setButtonText(t('导入或导出')).onClick(() => new ProfileModal(this.plugin, () => this.refreshSettings()).open()));
             renderEnvironmentSettings(panel, this.plugin, {
                 selected: this.appearanceType,
                 onSelect: key => { this.appearanceType = key; this.appearanceHost = undefined; },
@@ -57,9 +59,10 @@ class AcademicSettings extends PluginSettingTab {
             const details = panel.createEl('details', { cls: 'an-settings-details' });
             details.createEl('summary', { text: t('通用外观选项') }); render(details, 'appearance');
         } else if (this.section === 'numbering') {
+            new Setting(panel).setName(t('检查学术引用')).addButton(button => button.setButtonText(t('打开检查')).onClick(() => new ReferenceAuditModal(this.plugin).open()));
             render(panel, 'numbering');
             new Setting(panel).setName(t('引用默认格式与索引')).setHeading(); render(panel, 'references');
-        } else render(panel, this.section);
+        } else { if (this.section === 'export') new Setting(panel).setName(t('学术索引笔记')).setDesc(t('生成可在 Obsidian 内点击跳转的 Markdown 索引。')).addButton(button => button.setButtonText(t('生成索引')).onClick(() => new CatalogModal(this.plugin).open())); render(panel, this.section); }
     }
     async changeAppearance(field: keyof AppearanceEntry, value: string) {
         const all = paletteOverrides(this.plugin.settings), key = selectedPalette(this.plugin.settings, this.appearanceMode);

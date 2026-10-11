@@ -1,3 +1,12 @@
+# 2.15.2 Reference tools, Markdown indexes and shared profiles
+
+- 47 Node regressions pass. Added cases cover ordinary and ambiguous block links, duplicate IDs, numbering scopes, excluded and out-of-book targets, safe managed-region updates, profile allowlists/conflicts and rejected executable-style color inputs. A 1,001-note fixture reuses unchanged parses, refreshes only affected/dependent reading fragments, and skips duplicate graph work. An asynchronous-read test verifies that edits arriving during indexing are not lost.
+- Browser UI regressions verify source-line navigation, Markdown creation and refresh, one editor-region update preserving unsaved handwriting, and explicit preview before importing a profile. Actual CodeMirror checks verify session pause/resume without changing source or saved preferences. Existing caret/selection/IME, passive touch, idle mutation and scrolling regressions pass.
+- Phycat/Electron verification passes 15 palette cases, a 13-page PDF with 35 valid internal links and no invalid links or horizontal overflow, 84 optimized paragraphs with no fit fallbacks, long algorithm row boundaries, Proof widow/orphan pagination and all figure shrink/move/rollback priorities. The final index-editor changes were additionally exercised by the focused UI/algorithm/PDF suite.
+- TypeScript/build, mobile release-bundle loading and three-file release checks pass. ESLint has no errors and retains the two pre-existing isolated-DOM-helper recommendations.
+- Running Obsidian 1.14.4 loads version 2.15.2 and registers all five new commands. Actual profile and Markdown-index previews render without plugin errors. A repeated check of the local 37-note vault reports 37 reused parses, zero reads/parses/reading-fragment refreshes and no graph rebuild. Native verification does not modify note contents or saved settings.
+- Physical iPad/WKWebView scrolling recovery is not claimed verified. The new session pause and content-free KP status reporting are diagnostic/isolation tools; the existing opt-in recorder remains available for device acceptance.
+
 # 2.15.1 Patch release
 
 This release gives the previously validated consolidated fixes a distinct version for updates and Community Directory review. Runtime source and permissions are unchanged. Manifest, npm package/lockfile, compatibility metadata and generated bundle identify 2.15.1. The existing regression coverage and device-verification limits below continue to apply.

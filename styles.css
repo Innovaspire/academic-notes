@@ -1238,6 +1238,17 @@ body .markdown-source-view.mod-cm6 .callout:is([data-callout=figure], [data-call
     font-size: var(--font-ui-small);
   }
 }
+.an-profile-input {
+  width: 100%;
+  min-height: 12em;
+  font-family: var(--font-monospace);
+  resize: vertical;
+}
+.an-tool-results {
+  max-height: 50vh;
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
 
 .an-diagram-modal {
   width: min(850px, 96vw);

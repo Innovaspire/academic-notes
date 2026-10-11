@@ -269,7 +269,7 @@ function createLiveExtension(plugin: AcademicNotes) {
             this.decorations = this.links(update.view); this.schedule(); } }
         links(view: EditorView) {
             const live = view.state.field(Obs.editorLivePreviewField, false), info = view.state.field(Obs.editorInfoField, false);
-            if (!live || !info?.file || !plugin.settings.livePreview || !plugin.graph)
+            if (!live || !info?.file || !plugin.settings.livePreview || plugin.previewPaused || !plugin.graph)
                 return Decoration.none;
             const source = view.state.doc.toString(), note = plugin.graph.notes.get(info.file.path);
             // Never apply positions from a stale index to an edited document.
@@ -296,6 +296,17 @@ function createLiveExtension(plugin: AcademicNotes) {
             traceLayout(view.contentDOM, 'live.paint', { composing: view.composing });
             if (this.disposed || view.composing || view.compositionStarted || !view.state.field(Obs.editorLivePreviewField, false) || !info?.file)
                 return;
+            if (plugin.previewPaused) {
+                this.observer.disconnect(); this.deferredSelection = false;
+                try {
+                    for (const box of view.contentDOM.querySelectorAll<HTMLElement>('.callout')) {
+                        if (nativeCalloutBodyInteraction(box) || hasParagraphSelection(box)) { this.deferredSelection = true; continue; }
+                        if (box.closest('[contenteditable="false"]')) restoreParagraphs(box);
+                    }
+                    this.layouts = new WeakMap();
+                } finally { if (!this.disposed) this.observer.observe(view.contentDOM, { childList: true, subtree: true }); }
+                return;
+            }
             const note = plugin.graph?.notes.get(info.file.path);
             if (!note || note.source !== view.state.doc.toString())
                 return;
@@ -319,7 +330,7 @@ function createLiveExtension(plugin: AcademicNotes) {
             };
             this.observer.disconnect();
             try {
-                if (plugin.settings.livePreview) renderFragment(view.contentDOM, note, plugin.graph, infoFor);
+                if (plugin.settings.livePreview && !plugin.previewPaused) renderFragment(view.contentDOM, note, plugin.graph, infoFor);
                 let attempted = 0;
                 this.deferredSelection = false;
                 for (const box of view.contentDOM.querySelectorAll<HTMLElement>('.callout')) {
@@ -333,7 +344,7 @@ function createLiveExtension(plugin: AcademicNotes) {
                     const section = infoFor(box); if (!section) continue;
                     const from = view.state.doc.line(Math.min(view.state.doc.lines, section.lineStart + 1)).from;
                     const to = view.state.doc.line(Math.min(view.state.doc.lines, section.lineEnd + 1)).to;
-                    const enabled = plugin.settings.kpLivePreview && !view.state.selection.ranges.some(range => range.from <= to && range.to >= from);
+                    const enabled = plugin.settings.kpLivePreview && !plugin.previewPaused && !view.state.selection.ranges.some(range => range.from <= to && range.to >= from);
                     const content = box.querySelector<HTMLElement>(':scope > .callout-content'); if (!content) continue;
                     const title = box.querySelector<HTMLElement>(':scope > .callout-title'), win = box.ownerDocument.defaultView!;
                     const style = win.getComputedStyle(content), titleStyle = title && win.getComputedStyle(title);

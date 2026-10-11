@@ -12,6 +12,8 @@ The mathematical environments are visually inspired by [ElegantBook](https://git
 
 - Number theorems, definitions, lemmas, equations, figures, tables, subfigures and algorithms automatically or manually.
 - Reference blocks across notes, with reference suggestions and an option to number only referenced equations.
+- Check broken/ambiguous references and generate linked Markdown indexes by environment or note.
+- Share palettes, custom environments and reference formats through validated JSON profiles.
 - Choose light and dark color palettes, style nested callouts, and use three-line tables.
 - Write borderless proofs with an automatic QED square and remarks with a palette-matched title.
 - Draw commutative diagrams with a local grid editor (Beta), or use the optional TikZJax integration.
@@ -166,6 +168,31 @@ Open the command palette (`Ctrl+P` on Windows) and search for **Academic Notes**
 | Open diagnostics | Check plugin status and export environment |
 
 Type `\ref`, `\tref`, or `\eqref` for reference suggestions. The latter two filter to mathematical callouts or equations. Reading view and Live Preview replace reference labels; Source mode preserves the syntax. Moving the cursor into a reference in Live Preview also reveals its source. Custom aliases are preserved by default.
+
+## Reference checks and academic index notes
+
+Open the command palette and run **Academic Notes: Check academic references**. Choose the current note, its folder and subfolders, the entire indexed vault, or the current `phb-book` manifest. The checker finds missing target notes/blocks, ambiguous or duplicated IDs, manual-number conflicts within the same counter scope, and references outside a book. Ordinary Obsidian block links are accepted. An excluded target is reported as **not checked**, rather than a broken link. Filter results and use **Go to location** or **Other occurrence** to inspect the relevant source line. The checker does not modify notes.
+
+**Create academic index note** creates a regular `.md` file with ordinary internal links. It works inside Obsidian and does not require PDF export or an enabled plugin to follow its links:
+
+1. Choose the scope, destination path, environment types and grouping (by type or source note). Custom environments are included in the type selector.
+2. Preview the list, then choose **Create or update**. Numbered and unnumbered entries can be included.
+3. Open that index later and run **Update current academic index note** to regenerate it after edits. It is a saved list, not a continuously rewritten view.
+
+Unique block IDs link directly to their environments. Entries without a unique ID link to the nearest heading or source note and are explicitly marked. Use the existing add-block-ID command on an environment to make its next index entry precise. Original notes are not rewritten in bulk. Index labels use the numbering visible in the vault, including when its scope is a book; PDF chapter renumbering is separate.
+
+Only the region between `academic-notes:index:start` and `academic-notes:index:end` comments is updated. Keep your introduction and annotations outside those markers. Updating an ordinary note, a damaged index or an index with duplicate regions is refused. The embedded configuration remembers the original source and scope; if that source is moved or renamed, regenerate with the appropriate source/scope. Obsidian can track the ordinary links in the list according to its normal link-update preference. Generated index links do not cause otherwise unreferenced equations to become numbered.
+
+## Share palettes and environments
+
+Run **Share palettes and environments**, or use **Settings → Academic Notes → Environments → Import or export**.
+
+- **Show current profile** places the JSON in the text box for copying. **Save current profile in vault** writes `academic-style-*.json` to your configured export folder; on mobile use the Files app if Obsidian hides JSON files.
+- To import, paste the JSON or choose **Load JSON file**. Select **Keep local entries** (default) or **Use imported entries** for conflicts. Unrelated local definitions remain.
+- Optionally enable **Also apply the profile's palette selections and reference defaults**. Otherwise the current light/dark selections remain unchanged.
+- Choose **Preview import**, inspect the entries and conflicts, then **Apply import**. Changing the input or conflict options requires another preview.
+
+Profiles contain only palettes, motifs, environment definitions, environment names and reference formats/defaults. They exclude notes, folder paths, diagnostics, PDF settings and KP preferences. Their format is versioned and validated; arbitrary CSS, unsupported fields, invalid colors or reserved environment IDs are rejected. Importing profiles never changes Markdown environment IDs in existing notes. If an imported definition reuses an existing ID, the selected conflict policy determines which definition those callouts use.
 
 ## Settings overview
 
@@ -514,6 +541,7 @@ This is a bounded experiment for explicit figure callouts. Standalone diagrams, 
 
 ## Privacy and permissions
 
+- Profile import reads only the JSON file you explicitly select, or the text you paste. It is parsed locally and is not uploaded.
 - Markdown is indexed locally to resolve cross-file references, with configurable exclusions. No account, telemetry, or developer server is involved; note contents are not sent to the developer.
 - The installed plugin does not install software, launch external commands, or download runtime dependencies. Printing and PDF post-processing run locally.
 - The installed plugin does not use the Node filesystem API. PDF printing loads the snapshot as an in-memory Blob in an isolated hidden window; it does not create temporary HTML files outside the vault. Node integration, document scripts, network requests, local-file requests, and permission requests are disabled in that window. External hyperlinks can remain in PDFs without being visited during export.
@@ -523,6 +551,10 @@ This is a bounded experiment for explicit figure callouts. Standalone diagrams, 
 - Indexing and export do not rewrite notes. The add-ID, reference, environment and diagram commands edit the current note when invoked; rendered diagram edit/delete buttons update that diagram in the same note. Diagram data stays in the note's code block. TikZJax is an independently installed optional plugin; consult its documentation for its own permissions and behavior.
 
 ## Troubleshooting
+
+General diagnostics now include `indexPerformance` (notes read/reused/parsed, refreshed reading fragments, elapsed time and whether the graph was rebuilt) and content-free status entries for visible paragraphs. KP reasons distinguish optimized text, native editing/selections, unsupported content/styles, processing limits and fitting failures. These explain fallback; they do not promise that every paragraph can use KP.
+
+If you encounter an editor/scrolling problem, **Pause or resume Live Preview enhancements (this session)** temporarily suspends Academic Notes reference decorations and KP/indentation enhancements in the editor. Reading and export remain available; saved preferences and note text are unchanged. Use the command again to resume. It is an isolation/recovery aid, not a guarantee that a host or iPad scrolling freeze is fixed. The existing opt-in 90-second recorder remains useful for device-specific evidence.
 
 ### Record a device-specific layout or scrolling issue
 

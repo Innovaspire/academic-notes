@@ -24,7 +24,7 @@ export function customPalettes(raw: string): Record<string,PaletteDefinition> {
     } catch { /* Invalid local palettes fall back to built-in presets. */ }
     return result;
 }
-export function paletteOptions(settings: {customPalettes: string}, mode: PaletteMode) {
+export function paletteOptions(settings: {customPalettes: string}, mode: PaletteMode): Record<string, string> {
     return { theme: 'theme', ...Object.fromEntries(Object.entries(PRESETS).filter(([,p])=>p.mode===mode).map(([key,p])=>[key,p.name])), ...Object.fromEntries(Object.entries(customPalettes(settings.customPalettes)).filter(([,p])=>p.mode===mode).map(([key,p])=>[key,p.name])) };
 }
 export function selectedPalette(settings: PaletteSettings, mode: PaletteMode) {

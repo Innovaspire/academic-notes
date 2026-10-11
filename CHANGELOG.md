@@ -1,3 +1,11 @@
+# 2.15.2
+
+- Add a reference checker with note/folder/vault/book scopes, source navigation, duplicate and missing block diagnostics, manual-number conflicts and out-of-book targets. Ordinary block references are supported; excluded targets are reported separately.
+- Generate ordinary Markdown academic index notes with environment filters, grouping and block/heading links. Explicit updates preserve handwriting outside one managed region. Generated lists do not affect referenced-only equation numbering.
+- Share validated, versioned appearance/environment profiles, preview conflicts, and merge with either local or imported entries taking priority. Exclude note contents, filesystem paths, diagnostics and export/typography settings.
+- Reuse unchanged parsed notes and metadata, skip unchanged graph rebuilds, and refresh only affected reading/editor views. Delay automatic indexing until the workspace is ready; retain edits arriving during an in-flight update.
+- Explain KP fallback through content-free diagnostic status and add a session-only pause/resume command for Live Preview enhancements. Physical iPad scrolling recovery still requires device verification.
+
 # 2.15.1
 
 - Publish the consolidated fixes as a distinct patch release so the Community Directory can review a new version and installations on 2.15.0 can receive an update.

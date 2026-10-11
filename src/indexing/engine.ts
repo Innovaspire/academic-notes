@@ -59,6 +59,7 @@ export interface ParsedNote {
     media: SourceRecord[];
     callouts: SourceRecord[];
     blocks: Map<string, SourceRecord | null>;
+    anchors?: Map<string, number[]>;
     refs: SourceReference[];
     headings: {
         line: number;
@@ -69,6 +70,7 @@ export interface ParsedNote {
     _environments?: string;
     _mtime?: number;
     _fromEditor?: boolean;
+    _blocks?: string;
 }
 const TYPES: Record<string, string[]> = {
     def: ['Definition', 'definition', 'def'], thm: ['Theorem', 'theorem', 'thm'],
@@ -121,6 +123,8 @@ function quote(s: string) { const m = s.match(/^[ \t]*(?:>[ \t]*)*/)![0]; return
 function maskedSource(source: string) {
     // Preserve UTF-16 offsets: CodeMirror and Obsidian positions use those offsets.
     let masked = source.replace(/^\uFEFF?---\r?\n[\s\S]*?\r?\n---[^\S\r\n]*(?:\r?\n|$)/, blank);
+    // Generated lists must not make unreferenced equations numbered, or index themselves.
+    masked = masked.replace(/<!-- academic-notes:index:start[^]*?<!-- academic-notes:index:end -->/g, blank);
     masked = masked.replace(/<!--[\s\S]*?(?:-->|$)/g, blank).replace(/%%[\s\S]*?(?:%%|$)/g, blank);
     let fence: string | null = null;
     masked = masked.split('\n').map(line => {
@@ -242,8 +246,10 @@ function parse(path: string, source: string, cache: {
         rec.ids.push(id); if (!rec.id)
         rec.id = id; }
     const ids = [...prose.matchAll(/(?:^|[ \t])\^([A-Za-z0-9-]+)[ \t]*\r?$/gm)];
+    const anchors = new Map<string, number[]>();
     for (const m of ids) {
         const ln = lineOf(starts, m.index + m[0].indexOf('^')), q = quote(lines[ln]);
+        const locations = anchors.get(m[1]) || []; locations.push(ln); anchors.set(m[1], locations);
         const standalone = /^\^[\w-]+\s*$/.test(q.body.trim());
         let rec: SourceRecord | undefined;
         if (standalone) {
@@ -267,6 +273,10 @@ function parse(path: string, source: string, cache: {
     for (const block of algorithms) {
         const rec = records.find(r => r.kind === 'algorithm' && r.from === block.from);
         for (const id of block.ids) bind(rec, id);
+        for (let line = block.line; line <= block.endLine; line++) {
+            const id = quote(lines[line]).body.trim().match(/^\^([A-Za-z0-9-]+)$/)?.[1];
+            if (id && block.ids.includes(id)) { const locations = anchors.get(id) || []; if (!locations.includes(line)) locations.push(line); anchors.set(id, locations); }
+        }
     }
     // Cache supplements missing bindings; it must not overwrite an explicit nested subfigure ID.
     for (const [id, b] of Object.entries(cache.blocks || {})) {
@@ -307,7 +317,8 @@ function parse(path: string, source: string, cache: {
         if (!r.parent)
             warnings.push(t("{0}:{1} subfigure 不在 figure 内，仅显示题注，不猜测主图编号。", path, r.line + 1));
     }
-    return { _environments: opts.customEnvironments || '{}', path, source, lines, starts, records, theorems, equations, media, callouts, blocks, refs, headings, warnings };
+    for (const [id, locations] of anchors) if (locations.length > 1 && blocks.has(id)) blocks.set(id, null);
+    return { _environments: opts.customEnvironments || '{}', path, source, lines, starts, records, theorems, equations, media, callouts, blocks, anchors, refs, headings, warnings };
 }
 function splitTarget(raw: string) {
     raw = decode(raw);

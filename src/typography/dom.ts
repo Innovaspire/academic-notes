@@ -1,6 +1,7 @@
 import { solveParagraph, type KpItem } from './solver';
 import { traceLayout } from '../diagnostics/layout';
 import { nativeCalloutBodyInteraction } from '../rendering/editor-dom';
+import { setParagraphStatus, type ParagraphStatus } from './status';
 
 export interface ParagraphLayoutReport { processed: number; skipped: number; fallback: number }
 interface SavedParagraph { nodes: Node[]; lines: HTMLElement[]; owner?: object; marker: string | null; hadClass: boolean; hadQed: boolean; classAttribute: string | null; text: string | null }
@@ -44,6 +45,7 @@ function restore(p: HTMLElement, owner?: object) {
     const state = saved.get(p);
     if (state) {
         if (owner && state.owner !== owner) return;
+        setParagraphStatus(p, 'native');
         // A host rerender may already have replaced our lines. Never overwrite its new content.
         if (isOwned(p, state)) p.replaceChildren(...state.nodes);
         else if (p.childNodes.length === state.lines.length && state.lines.every((line, index) => p.childNodes[index] === line)) unwrapLines(p);
@@ -66,21 +68,23 @@ function proofEnd(p: HTMLElement) {
     return p.matches('.callout:is([data-callout="proof"],[data-callout="pf"]) > .callout-content > p:last-child') &&
         p.ownerDocument.defaultView!.getComputedStyle(p, '::after').content.replace(/["']/g, '') === '□';
 }
-function eligible(p: HTMLElement, readonlyCallout?: HTMLElement) {
-    if (p.closest(EXCLUDED) || editableContext(p, readonlyCallout) || p.querySelector('[contenteditable],br,img,video,audio,iframe,button,input,textarea,select,canvas,pre,table,.math-block,mjx-container[display="true"],.phb-math[data-display="true"],.an-diagram-block')) return false;
-    const win = p.ownerDocument.defaultView; if (!win) return false;
+function ineligible(p: HTMLElement, readonlyCallout?: HTMLElement): ParagraphStatus | null {
+    if (p.closest(EXCLUDED)) return 'excluded';
+    if (editableContext(p, readonlyCallout)) return 'editing';
+    if (p.querySelector('[contenteditable],br,img,video,audio,iframe,button,input,textarea,select,canvas,pre,table,.math-block,mjx-container[display="true"],.phb-math[data-display="true"],.an-diagram-block')) return 'unsupported-content';
+    const win = p.ownerDocument.defaultView; if (!win) return 'unsupported-style';
     const style = win.getComputedStyle(p);
-    if (style.direction !== 'ltr' || style.writingMode !== 'horizontal-tb' || style.whiteSpace !== 'normal' || !/^\d+(?:\.\d+)?px$/.test(style.textIndent) || !['start', 'left', 'justify'].includes(style.textAlign)) return false;
+    if (style.direction !== 'ltr' || style.writingMode !== 'horizontal-tb' || style.whiteSpace !== 'normal' || !/^\d+(?:\.\d+)?px$/.test(style.textIndent) || !['start', 'left', 'justify'].includes(style.textAlign)) return 'unsupported-style';
     for (const pseudo of ['::before', '::after']) {
         const value = win.getComputedStyle(p, pseudo).content;
-        if (value && !['none', 'normal', '""', "''"].includes(value) && !(pseudo === '::after' && proofEnd(p))) return false;
+        if (value && !['none', 'normal', '""', "''"].includes(value) && !(pseudo === '::after' && proofEnd(p))) return 'unsupported-style';
     }
     for (const element of p.children) {
-        if (!/^(A|EM|STRONG|B|I|S|DEL|MARK|U|SUB|SUP|CODE|SMALL|SPAN|MJX-CONTAINER|SVG)$/.test(element.tagName.toUpperCase())) return false;
+        if (!/^(A|EM|STRONG|B|I|S|DEL|MARK|U|SUB|SUP|CODE|SMALL|SPAN|MJX-CONTAINER|SVG)$/.test(element.tagName.toUpperCase())) return 'unsupported-content';
         const inline = win.getComputedStyle(element);
-        if (inline.cssFloat !== 'none' || !['inline', 'inline-block', 'inline-flex'].includes(inline.display) || inline.position === 'absolute' || inline.position === 'fixed') return false;
+        if (inline.cssFloat !== 'none' || !['inline', 'inline-block', 'inline-flex'].includes(inline.display) || inline.position === 'absolute' || inline.position === 'fixed') return 'unsupported-style';
     }
-    return true;
+    return null;
 }
 function textUnits(node: Text): Unit[] | null {
     const Segmenter = Intl.Segmenter;
@@ -239,15 +243,19 @@ function apply(p: HTMLElement, tokens: Token[], width: number, owner?: object) {
 }
 function layout(root: HTMLElement, owner?: object, readonlyCallout?: HTMLElement): ParagraphLayoutReport {
     const report = { processed: 0, skipped: 0, fallback: 0 };
-    if (root.closest(EXCLUDED) || editableContext(root, readonlyCallout) || hasParagraphSelection(root)) return { processed: 0, skipped: paragraphs(root).length, fallback: 0 };
+    if (root.closest(EXCLUDED) || editableContext(root, readonlyCallout) || hasParagraphSelection(root)) {
+        for (const p of paragraphs(root)) setParagraphStatus(p, root.closest(EXCLUDED) ? 'excluded' : editableContext(root, readonlyCallout) ? 'editing' : 'selection');
+        return { processed: 0, skipped: paragraphs(root).length, fallback: 0 };
+    }
     let total = 0, attempted = 0;
     for (const p of paragraphs(root)) {
         const existing = saved.get(p);
         if (owner && existing?.owner && existing.owner !== owner) { report.skipped++; continue; }
         restore(p, owner);
         const text = p.textContent || '';
-        if (!eligible(p, readonlyCallout) || !text.trim() || text.length > MAX_CHARACTERS || attempted >= MAX_PARAGRAPHS || total >= MAX_TOTAL_ITEMS) { report.skipped++; continue; }
-        const width = contentWidth(p); if (!Number.isFinite(width) || width < 80) { report.skipped++; continue; }
+        const reason = ineligible(p, readonlyCallout) || (!text.trim() ? 'short' : text.length > MAX_CHARACTERS || attempted >= MAX_PARAGRAPHS || total >= MAX_TOTAL_ITEMS ? 'limit' : null);
+        if (reason) { setParagraphStatus(p, reason); report.skipped++; continue; }
+        const width = contentWidth(p); if (!Number.isFinite(width) || width < 80) { setParagraphStatus(p, 'narrow'); report.skipped++; continue; }
         const units: Unit[] = [];
         let unsupported = false;
         for (const node of p.childNodes) {
@@ -255,14 +263,15 @@ function layout(root: HTMLElement, owner?: object, readonlyCallout?: HTMLElement
             else if (node.nodeType === 1) units.push({ node, text: node.textContent || '', kind: 'inline' });
             else { unsupported = true; break; }
         }
-        if (unsupported || units.length > MAX_ITEMS) { report.skipped++; continue; }
+        if (unsupported || units.length > MAX_ITEMS) { setParagraphStatus(p, unsupported ? 'unsupported-content' : 'limit'); report.skipped++; continue; }
         const estimated = units.length + units.filter((unit, index) => index > 0 && units[index - 1].kind !== 'space' && unit.kind !== 'space' && (units[index - 1].kind === 'cjk' || unit.kind === 'cjk') && legalBoundary(units[index - 1], unit)).length;
-        if (total + estimated > MAX_TOTAL_ITEMS) { report.skipped++; continue; }
+        if (total + estimated > MAX_TOTAL_ITEMS) { setParagraphStatus(p, 'limit'); report.skipped++; continue; }
         total += estimated;
         attempted++;
         const tokens = measure(p, units);
-        if (!tokens) { report.fallback++; continue; }
+        if (!tokens) { setParagraphStatus(p, 'measure-failed'); report.fallback++; continue; }
         const result = apply(p, tokens, width, owner);
+        setParagraphStatus(p, result === 'processed' ? 'optimized' : result === 'fallback' ? 'cannot-fit' : 'short');
         if (result === 'processed') report.processed++; else if (result === 'fallback') report.fallback++; else report.skipped++;
     }
     traceLayout(root, 'kp.layout', report);

@@ -1,3 +1,11 @@
+# 2.15.2 Reference tools, Markdown indexes and shared profiles
+
+Reference checks use the existing local Markdown index and Obsidian metadata to report broken, ambiguous, duplicate and out-of-book references. They do not modify source notes. Generated indexes are ordinary Markdown notes written through the Vault API or a single undoable editor-region update; refresh preserves text outside the managed region and refuses to overwrite unrelated notes.
+
+Style profiles contain only an explicit allowlist of appearance, environment and reference settings. Import reads a JSON file chosen by the user or pasted text, validates its schema, colors, identifiers and size, and requires preview before applying conflict choices. Profiles exclude note contents, vault paths, diagnostics and export destinations. No new dependency, network access or direct filesystem capability is introduced.
+
+Incremental indexing reuses unchanged parses and refreshes affected readers only. Content-free KP status explanations and a session-only Live Preview pause help diagnose device-specific layout issues. Physical iPad scrolling recovery remains unverified; the diagnostic tools do not claim to resolve the reported freeze.
+
 # 2.15.1 Patch release
 
 This release gives the previously validated consolidated fixes a distinct version for updates and Community Directory review. Runtime source and permissions are unchanged. Manifest, npm package/lockfile, compatibility metadata and generated bundle identify 2.15.1. The existing regression coverage and device-verification limits below continue to apply.

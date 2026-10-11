@@ -105,6 +105,11 @@ export async function runKpLiveRegressions() {
         check(top > 0, 'scroll fixture must actually scroll');
         for (let n = 0; n < 3; n++) { view.dispatch({ effects: plugin.refreshEffect.of(n) }); await settle(); }
         check(Math.abs(view.scrollDOM.scrollTop - top) < 2, 'idle refresh must preserve scroll position');
+        plugin.previewPaused = true; view.dispatch({ effects: plugin.refreshEffect.of(104) });
+        check(breaks() === 0 && !view.dom.classList.contains('an-kp-native-justify'), 'Session pause must synchronously remove enhanced line layout');
+        check(plugin.settings.kpLivePreview === true && view.state.doc.toString() === stableText, 'Pause must retain preferences and source');
+        plugin.previewPaused = false; view.dispatch({ effects: plugin.refreshEffect.of(105) }); await settle();
+        check(view.dom.classList.contains('an-kp-native-justify'), 'Resuming must re-enable the existing preference');
         plugin.settings.kpLivePreview = false; view.dispatch({ effects: plugin.refreshEffect.of(4) });
         check(breaks() === 0, 'disabling must synchronously restore native layout');
         check(!view.dom.classList.contains('an-kp-native-justify') && !view.dom.classList.contains('an-prose-indent-enabled'), 'Disabling typography must remove native styling flags');
