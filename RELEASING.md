@@ -1,5 +1,7 @@
 # Release and submission
 
+Keep the English and Chinese READMEs focused on project features. Detailed user documentation lives in the [Wiki](https://github.com/Kristal-Boltinn/academic-notes/wiki), with a [Chinese guide](https://github.com/Kristal-Boltinn/academic-notes/wiki/Home-ZH). Update the matching Wiki pages when behavior changes; its separate Git repository is `https://github.com/Kristal-Boltinn/academic-notes.wiki.git`.
+
 1. Confirm the public author identity and the unique `academic-notes` ID / Academic Notes name in the Community Directory. The generic contributors author is intentional until a public identity is chosen.
 2. Run `npm ci`, `npm run lint`, `npm test`, `npm run build`, `npm run test:electron`, `npm run check:release`. On Linux the Electron test requires a display (CI uses `xvfb-run`).
 3. Install only the three built release files into a test vault as `academic-notes`. Verify plugin enable/disable, source vs Live Preview, scrolling/nesting, references, theme switches, single-note PDF and a multi-note book, including long formulas, fonts and images.
