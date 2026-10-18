@@ -127,7 +127,7 @@ test('plugin lifecycle registers new commands, drops removed settings and restor
   try {
     setTestLanguage('en');
     await plugin.onload();
-      assert.equal(plugin.commands.length, 18);
+      assert.equal(plugin.commands.length, 19);
     assert.equal(plugin.commands.find((c: any) => c.id === 'export-current-pdf').name, 'Export current note to PDF');
     assert.ok(!plugin.commands.some((c: any) => c.id === 'setup-pdf'));
     for (const key of ['legacy', 'legacyCaptions', 'followPhycat', 'pythonPath']) assert.ok(!(key in plugin.settings));
@@ -185,7 +185,7 @@ test('mobile registers numbering and HTML commands without desktop PDF', async (
   plugin.data={customAppearance:JSON.stringify({thm:{light:'#112233'}})};
   try {
     await plugin.onload();
-      assert.equal(plugin.commands.length, 15);
+      assert.equal(plugin.commands.length, 16);
     assert.equal(paletteValues(plugin.settings,'light')['--an-color-thm'],'#112233','Mobile upgrades must migrate colors too');
     assert.ok(plugin.commands.every((command: any) => !command.id.endsWith('-pdf')));
     for (const id of ['export-current', 'export-book', 'insert-reference', 'label-block', 'insert-environment', 'refresh', 'start-layout-diagnostics', 'stop-layout-diagnostics'])

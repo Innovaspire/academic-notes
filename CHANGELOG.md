@@ -1,3 +1,12 @@
+# 2.15.3
+
+- Save and reopen book manifests with chapter order/titles, subtitles and TOC depth. Review references before export and cancel active snapshot/PDF work.
+- Track source note/folder renames in generated academic indexes; preserve handwritten content and show refresh status and generation time in Reading view.
+- Search unlabelled environments and add a unique block ID when inserting a reference. Preserve open unsaved buffers and reject ambiguous or changed targets.
+- Add parallel, injection, surjection and isomorphism arrows with optional curvature to the diagram editor, preserving version-1 diagrams.
+- Review custom-environment usage before deleting its definition, or hide it from insertion while retaining existing rendering and references.
+- Add isolated WebKit portrait/landscape regression coverage and a synthetic on-device mobile acceptance note. WebKit testing does not replace Obsidian iPad acceptance.
+
 # 2.15.2
 
 - Add a reference checker with note/folder/vault/book scopes, source navigation, duplicate and missing block diagnostics, manual-number conflicts and out-of-book targets. Ordinary block references are supported; excluded targets are reported separately.

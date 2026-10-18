@@ -5,6 +5,7 @@ export interface CustomEnvironment {
     abbr: string;
     style: typeof ENVIRONMENT_STYLES[number];
     numbered: boolean;
+    retired?: boolean;
     light?: string;
     dark?: string;
 }
@@ -23,6 +24,7 @@ export function readEnvironments(raw: string, reserved: string[]): Record<string
             if (!validEnvironmentKey(key, reserved) || !object(entry) || typeof entry.name !== 'string' || !entry.name.trim()) continue;
             const style = ENVIRONMENT_STYLES.includes(entry.style as CustomEnvironment['style']) ? entry.style as CustomEnvironment['style'] : 'thm';
             const clean: CustomEnvironment = { name: entry.name.trim().slice(0, 100), abbr: typeof entry.abbr === 'string' ? entry.abbr.trim().slice(0, 100) || key : key, style, numbered: entry.numbered !== false };
+            if (entry.retired === true) clean.retired = true;
             for (const mode of ['light', 'dark'] as const) if (typeof entry[mode] === 'string' && /^#[0-9a-f]{6}$/i.test(entry[mode])) clean[mode] = entry[mode];
             result[key] = clean;
         }

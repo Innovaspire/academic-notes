@@ -1,3 +1,11 @@
+# 2.15.3 Workflow review notes
+
+Book manifests and explicit reference insertion use the Editor/Vault APIs and preserve unsaved buffers. Rename events update only validated generated-index regions; manual lists and annotations remain unchanged. Custom-environment deletion is preceded by an indexed-usage review and preserves Markdown. Retired definitions remain active for rendering.
+
+Diagram arrow fields are bounded enums/integers; all math labels use existing local renderers. Cancellation uses the existing export AbortController, extended to snapshot preparation and local resource reads. Completed diagnostic artifacts may remain after cancellation.
+
+Playwright and YAML are development/test dependencies only. The installed three-file plugin never installs browsers or packages. WebKit testing runs against synthetic fixtures, not a real vault. No new plugin network access or Node filesystem permission is introduced.
+
 # 2.15.2 Reference tools, Markdown indexes and shared profiles
 
 Reference checks use the existing local Markdown index and Obsidian metadata to report broken, ambiguous, duplicate and out-of-book references. They do not modify source notes. Generated indexes are ordinary Markdown notes written through the Vault API or a single undoable editor-region update; refresh preserves text outside the managed region and refuses to overwrite unrelated notes.

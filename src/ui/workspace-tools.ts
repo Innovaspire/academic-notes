@@ -1,5 +1,8 @@
 import { Modal, Setting, Notice, TFile, MarkdownView } from 'obsidian';
 import type AcademicNotes from '../main';
+import { editNote } from '../workspace/notes';
+import { catalogContent, remapCatalog } from '../workspace/catalog';
+import type { MarkdownPostProcessorContext } from 'obsidian';
 import Engine from '../indexing/engine';
 import { t } from '../i18n';
 import { auditReferences, auditLabel, type AuditIssue } from '../workspace/audit';
@@ -9,10 +12,10 @@ import { paletteOptions } from '../rendering/palettes';
 
 type Scope = CatalogOptions['scope'];
 function scopeOptions() { return { note: t('当前笔记'), folder: t('当前文件夹及子文件夹'), vault: t('整个库'), book: t('当前 phb-book 清单') }; }
-async function scopedPaths(plugin: AcademicNotes, scope: Scope, source: string) {
+async function scopedPaths(plugin: AcademicNotes, scope: Scope, source: string, savedFolder?: string) {
     const paths = [...plugin.graph!.notes.keys()].sort((a, b) => a.localeCompare(b));
     if (scope === 'vault') return new Set(paths);
-    if (scope === 'folder') { const folder = source.slice(0, source.lastIndexOf('/') + 1); return new Set(paths.filter(path => path.startsWith(folder))); }
+    if (scope === 'folder') { const folder = savedFolder === undefined ? source.slice(0, source.lastIndexOf('/') + 1) : savedFolder ? savedFolder + '/' : '';  return new Set(paths.filter(path => path.startsWith(folder))); }
     if (scope === 'book') {
         const file = plugin.app.vault.getAbstractFileByPath(source);
         if (!(file instanceof TFile)) throw new Error(t('目标笔记不存在'));
@@ -72,7 +75,7 @@ export class ReferenceAuditModal extends Modal {
         if (visible.length > 200) this.results.createEl('p', { text: t('结果较多，请用筛选缩小范围。') });
     }
 }
-function notePath(raw: string) {
+export function notePath(raw: string) {
     const path = raw.trim().replace(/\\/g, '/');
     // eslint-disable-next-line no-control-regex -- A generated file must remain within the vault.
     if (!path || path.startsWith('/') || path.split('/').some(part => !part || part === '.' || part === '..' || part.startsWith('.')) || /[<>:"|?*#[\]\x00-\x1f]/.test(path))
@@ -85,7 +88,7 @@ function indexEditor(plugin: AcademicNotes, file: TFile) {
 async function writeIndex(plugin: AcademicNotes, file: TFile, options: CatalogOptions, body: string, checkConfig = false) {
     const update = (current: string) => {
         if (checkConfig && JSON.stringify(readCatalog(current)) !== JSON.stringify(options)) throw new Error(t('索引配置已变化，请重试。'));
-        return updateCatalog(current, options, body);
+        return updateCatalog(current, { ...options, generatedAt: new Date().toISOString() }, body);
     };
     const editor = indexEditor(plugin, file);
     if (editor) {
@@ -143,20 +146,58 @@ export class CatalogModal extends Modal {
         this.preview = this.contentEl.createDiv();
     }
     private async prepare() {
-        const options = { ...this.options, types: [...this.options.types] }, destination = notePath(this.destination);
+        const options = { ...this.options, types: [...this.options.types], generatedAt: new Date().toISOString(), ...(this.options.scope === 'folder' ? {folder:this.options.source.slice(0, this.options.source.lastIndexOf('/') + 1).replace(/\/$/, '')} : {}) }, destination = notePath(this.destination);
         await this.plugin.rebuild();
-        const body = catalogBody(this.plugin.graph!, options, await scopedPaths(this.plugin, options.scope, options.source), destination);
+        const body = catalogBody(this.plugin.graph!, options, await scopedPaths(this.plugin, options.scope, options.source, options.folder), destination);
         return { options, destination, body };
     }
 }
-export async function refreshCatalog(plugin: AcademicNotes) {
-    const file = plugin.app.workspace.getActiveFile(); if (!(file instanceof TFile)) throw new Error(t('请先打开一篇 Markdown 笔记。'));
+export async function refreshCatalog(plugin: AcademicNotes, selectedFile?: TFile) {
+    const file = selectedFile || plugin.app.workspace.getActiveFile(); if (!(file instanceof TFile)) throw new Error(t('请先打开一篇 Markdown 笔记。'));
     const source = indexEditor(plugin, file)?.getValue() ?? await plugin.app.vault.read(file), options = readCatalog(source);
     if (!options) throw new Error(t('当前笔记不是 Academic Notes 生成的索引。'));
+    await plugin.catalogRenameQueue;
     await plugin.rebuild();
-    const body = catalogBody(plugin.graph!, options, await scopedPaths(plugin, options.scope, options.source), file.path);
+    const currentSource = indexEditor(plugin, file)?.getValue() ?? await plugin.app.vault.read(file);
+    const currentOptions = readCatalog(currentSource); if (!currentOptions) throw new Error(t('当前笔记不是 Academic Notes 生成的索引。'));
+    Object.assign(options, currentOptions);
+    const body = catalogBody(plugin.graph!, options, await scopedPaths(plugin, options.scope, options.source, options.folder), file.path);
     await writeIndex(plugin, file, options, body, true);
     new Notice(t('学术索引已更新；手写内容保留。'));
+}
+export async function renameCatalogSources(plugin: AcademicNotes, oldPath: string, newPath: string) {
+    for (const file of plugin.app.vault.getMarkdownFiles()) {
+        if (!plugin.active) return;
+        const source = indexEditor(plugin, file)?.getValue() ?? await plugin.app.vault.cachedRead(file);
+        if (!source.includes(CATALOG_START)) continue;
+        let changed: string;
+        try { changed = remapCatalog(source, oldPath, newPath); } catch { continue; }
+        if (changed !== source) await editNote(plugin, file, current => remapCatalog(current, oldPath, newPath));
+    }
+}
+const catalogChecks = new WeakMap<HTMLElement, number>();
+export async function showCatalogStatus(plugin: AcademicNotes, el: HTMLElement, ctx: MarkdownPostProcessorContext) {
+    if (ctx.getSectionInfo(el)?.lineStart !== 0) return;
+    const source = plugin.graph?.notes.get(ctx.sourcePath)?.source;
+    if (!source?.includes(CATALOG_START)) return;
+    const serial = (catalogChecks.get(el) || 0) + 1; catalogChecks.set(el, serial);
+    let message: string;
+    try {
+        const options = readCatalog(source); if (!options) return;
+        const body = catalogBody(plugin.graph!, options, await scopedPaths(plugin, options.scope, options.source, options.folder), ctx.sourcePath);
+        message = (body.trim() === catalogContent(source) ? t('学术索引已是最新。') : t('来源内容已变化，点击更新索引。')) + (options.generatedAt ? ' · ' + t('上次生成：{0}', new Date(options.generatedAt).toLocaleString()) : '');
+    } catch (e) { message = e instanceof Error ? e.message : String(e); }
+    if (catalogChecks.get(el) !== serial || !plugin.active) return;
+    el.querySelector(':scope > .an-index-status')?.remove();
+    const banner = el.createDiv({ cls: 'an-index-status' }); banner.createSpan({ text: message });
+    const button = banner.createEl('button', { text: t('更新当前学术索引笔记') });
+    button.addEventListener('click', () => {
+        button.disabled = true;
+        const file = plugin.app.vault.getAbstractFileByPath(ctx.sourcePath);
+        if (!(file instanceof TFile)) return;
+        void refreshCatalog(plugin, file).catch(e => plugin.fail(t('更新当前学术索引笔记'), e)).finally(() => { button.disabled = false; });
+    });
+    el.prepend(banner);
 }
 export class ProfileModal extends Modal {
     private input: HTMLTextAreaElement;

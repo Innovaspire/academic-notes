@@ -1,9 +1,10 @@
 import { t } from '../i18n';
-import { emptyDiagram, isCommutingTriangle, parseDiagram, removeArrow, removeNode, resizeDiagram, type DiagramData } from './model';
+import { emptyDiagram, isCommutingTriangle, parseDiagram, removeArrow, removeNode, resizeDiagram, type DiagramArrow, type DiagramData } from './model';
 import { renderDiagram } from './render';
 
 export class DiagramEditor {
     data: DiagramData; selected = ''; selectedArrow = ''; mode = 'nodes'; start = ''; history: string[] = [];
+    head: HTMLSelectElement; curve: HTMLSelectElement; parallel: HTMLButtonElement;
     selectedCommutation = ''; commutationNodes: string[] = []; hint = ''; removeCommutation: HTMLButtonElement;
     gridEl: HTMLElement; preview: HTMLElement; list: HTMLElement; status: HTMLElement;
     gridSelect: HTMLSelectElement; enabled: HTMLInputElement; caption: HTMLInputElement; nodeLabel: HTMLInputElement; arrowLabel: HTMLInputElement; style: HTMLSelectElement; side: HTMLSelectElement;
@@ -29,6 +30,10 @@ export class DiagramEditor {
         this.arrowLabel = input(t('箭头标注'), text => { const arrow = this.data.arrows.find(a => a.id === this.selectedArrow); if (arrow) arrow.label = text; });
         this.style = select(fields, t('箭头线型'), { solid: t('实线'), dashed: t('虚线') }, 'solid', v => { const arrow = this.data.arrows.find(a => a.id === this.selectedArrow); if (arrow) { this.remember(); arrow.style = v as 'solid' | 'dashed'; this.refresh(); } });
         this.side = select(fields, t('标注位置'), { above: t('左侧／上方'), below: t('右侧／下方') }, 'above', v => { const arrow = this.data.arrows.find(a => a.id === this.selectedArrow); if (arrow) { this.remember(); arrow.side = v as 'above' | 'below'; this.refresh(); } });
+        this.head = select(fields, t('箭头类型'), {normal:t('普通箭头'), injective:t('单射'), surjective:t('满射'), isomorphism:t('同构')}, 'normal', v => { const a = this.data.arrows.find(a => a.id === this.selectedArrow); if (a) { this.remember(); a.head = v as DiagramArrow['head']; this.refresh(); } });
+        this.curve = select(fields, t('箭头弯曲'), {'-1':t('左弯'), '0':t('自动'), '1':t('右弯')}, '0', v => { const a = this.data.arrows.find(a => a.id === this.selectedArrow); if (a) { this.remember(); a.curve = Number(v) as DiagramArrow['curve']; this.refresh(); } });
+        this.parallel = fields.createEl('button', {text:t('添加平行箭头'), attr:{'data-an-action':'parallel-arrow'}});
+        this.parallel.addEventListener('click', () => { const a = this.data.arrows.find(a => a.id === this.selectedArrow); if (!a || this.data.arrows.length >= 36) return; this.remember(); let n = 1; while (this.data.arrows.some(a => a.id === 'a-' + n)) n++; const copy = {...a, id:'a-' + n, label:'', curve:0 as const, side:a.side === 'above' ? 'below' as const : 'above' as const}; this.data.arrows.push(copy); this.selectedArrow = copy.id; this.refresh(); });
         const remove = fields.createEl('button', { text: t('删除当前箭头'), attr: { 'data-an-action': 'remove-arrow' } }); remove.addEventListener('click', () => { this.remember(); removeArrow(this.data, this.selectedArrow); this.refresh(); });
         this.removeCommutation = fields.createEl('button', { text: t('删除当前交换符'), attr: { 'data-an-action': 'remove-commutation' } });
         this.removeCommutation.addEventListener('click', () => { this.remember(); this.data.commutations = this.data.commutations?.filter(c => c.id !== this.selectedCommutation); this.refresh(); });
@@ -91,12 +96,14 @@ export class DiagramEditor {
         if (!node && !/^n-[0-2]-[0-2]$/.test(this.selected)) this.selected = '';
         this.enabled.disabled = !this.selected; this.enabled.checked = !!node;
         this.nodeLabel.disabled = !node; if (this.nodeLabel.value !== (node?.label || '')) this.nodeLabel.value = node?.label || '';
-        this.arrowLabel.disabled = this.style.disabled = this.side.disabled = !arrow;
+        this.arrowLabel.disabled = this.style.disabled = this.side.disabled = this.head.disabled = this.curve.disabled = !arrow;
+        this.parallel.disabled = !arrow || this.data.arrows.length >= 36;
+        this.head.value = arrow?.head || 'normal'; this.curve.value = String(arrow?.curve || 0);
         if (this.arrowLabel.value !== (arrow?.label || '')) this.arrowLabel.value = arrow?.label || '';
         this.style.value = arrow?.style || 'solid'; this.side.value = arrow?.side || 'above';
         this.list.empty(); for (const item of this.data.arrows) {
             const name = `${this.data.nodes.find(n => n.id === item.from)!.label} → ${this.data.nodes.find(n => n.id === item.to)!.label}`;
-            const button = this.list.createEl('button', { text: name, attr: { 'aria-pressed': String(item.id === this.selectedArrow) } }); button.addEventListener('click', () => { this.selectedArrow = item.id; this.selectedCommutation = ''; this.refresh(); });
+            const button = this.list.createEl('button', { text: name + (item.label ? ' · ' + item.label : '') + ' [' + item.id + ']', attr: { 'aria-pressed': String(item.id === this.selectedArrow) } }); button.addEventListener('click', () => { this.selectedArrow = item.id; this.selectedCommutation = ''; this.refresh(); });
         }
         for (const item of this.data.commutations || []) {
             const name = (id: string) => this.data.nodes.find(n => n.id === id)!.label;

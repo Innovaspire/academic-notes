@@ -1,8 +1,13 @@
-import type { DiagramCommutation, DiagramData } from './model';
+import type { DiagramArrow, DiagramCommutation, DiagramData } from './model';
 export const diagramPosition = (data: DiagramData, id: string) => {
     const node = data.nodes.find(n => n.id === id)!;
     return { x: 110 + node.col * 240, y: 85 + node.row * 160 };
 };
+export function arrowBend(data: DiagramData, arrow: DiagramArrow) {
+    const peers = data.arrows.filter(a => a.from === arrow.from && a.to === arrow.to || a.from === arrow.to && a.to === arrow.from);
+    const lane = Math.max(-56, Math.min(56, (peers.findIndex(a => a.id === arrow.id) - (peers.length - 1) / 2) * 36));
+    return lane * (arrow.from < arrow.to ? 1 : -1) + (arrow.curve || 0) * 48;
+}
 /** A quarter-circle wholly inside the triangle's incircle, facing the via node. */
 export function commutationArc(data: DiagramData, marker: DiagramCommutation) {
     const a = diagramPosition(data, marker.from), b = diagramPosition(data, marker.via), c = diagramPosition(data, marker.to);

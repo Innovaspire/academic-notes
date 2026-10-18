@@ -7,7 +7,7 @@ import type { EditorView } from '@codemirror/view';
 import type { StateEffectType } from '@codemirror/state';
 import type { ParsedNote, SourceRecord, NoteGraph } from './indexing/engine';
 import type { Editor, MarkdownPostProcessorContext } from 'obsidian';
-interface ExportSelection { files: { file: TFile; title: string }[]; options: { book: boolean; title: string; subtitle: string; tocDepth: number } }
+export interface ExportSelection { files: { file: TFile; title: string }[]; options: { book: boolean; title: string; subtitle: string; tocDepth: number } }
 import * as Obs from 'obsidian';
 import { Plugin, Setting, Notice, TFile, MarkdownView, MarkdownRenderer, Component, MarkdownRenderChild, Modal, normalizePath } from 'obsidian';
 import Engine from './indexing/engine';
@@ -17,6 +17,7 @@ import { titleRecord, mediaRecord, renderFragment, createLiveExtension, allNodes
 import { createLiveParagraphExtension } from './typography/live';
 import { updateFigureImageRatio } from './rendering/figure-layout';
 import { appearanceVariables } from './rendering/custom-appearance';
+import { reviewBookReferences } from './ui/book';
 import { ProgressModal, ReferencePicker, ReferenceSuggest, BookPicker, EnvironmentModal } from './ui/modals';
 import { AcademicSettings } from './ui/settings-tab';
 import { exportPdf, pdfAvailability } from './export/pdf';
@@ -25,8 +26,9 @@ import { openDiagramEditor, diagramProcessor } from './ui/diagram-modal';
 import { createParagraphLayoutController, hasParagraphSelection, restoreParagraphs } from './typography/dom';
 import { editorFragment } from './rendering/editor-dom';
 import { LayoutRecorder, traceLayout, type LayoutReport } from './diagnostics/layout';
+import { frontmatter, noteEditor, editNote, replaceBuffer, currentRecord, labelInsertion } from './workspace/notes';
 import { visibleTypographyStatus } from './typography/status';
-import { ReferenceAuditModal, CatalogModal, ProfileModal, refreshCatalog } from './ui/workspace-tools';
+import { ReferenceAuditModal, CatalogModal, ProfileModal, refreshCatalog, renameCatalogSources, showCatalogStatus } from './ui/workspace-tools';
 import diagramCss from './styles/diagrams.css';
 import typographyCss from './styles/typography.css';
 import calloutCss from './styles/callouts.css';
@@ -53,6 +55,7 @@ export default class AcademicNotes extends Plugin {
     rerun = false;
     indexPromise: Promise<void> | undefined;
     indexTimer: number | undefined;
+    catalogRenameQueue: Promise<void> = Promise.resolve();
     indexReady = false;
     previewPaused = false;
     indexMetrics = { files: 0, parsed: 0, reused: 0, read: 0, refreshed: 0, durationMs: 0, graphRebuilt: false };
@@ -117,6 +120,7 @@ export default class AcademicNotes extends Plugin {
         this.addCommand({ id: 'export-book', name: t("按 phb-book 清单导出 HTML 快照"), callback: () => this.exportActive(true, false) });
         this.addCommand({ id: 'diagnostics', name: t("检查插件状态与导出环境"), callback: () => this.diagnostics() });
         this.addCommand({ id: 'check-references', name: t('检查学术引用'), callback: () => new ReferenceAuditModal(this).open() });
+        this.addCommand({ id: 'edit-book-manifest', name: t('新建或编辑合订本清单'), callback: () => new BookPicker(this).open() });
         this.addCommand({ id: 'create-academic-index', name: t('生成学术索引笔记'), callback: () => new CatalogModal(this).open() });
         this.addCommand({ id: 'update-academic-index', name: t('更新当前学术索引笔记'), callback: () => { void refreshCatalog(this).catch(error => this.fail(t('更新当前学术索引笔记'), error)); } });
         this.addCommand({ id: 'share-style-profile', name: t('分享配色与环境方案'), callback: () => new ProfileModal(this).open() });
@@ -162,7 +166,7 @@ export default class AcademicNotes extends Plugin {
             if (file) this.dirty.set(file.path, true); this.scheduleIndex(); }));
         this.registerEvent(this.app.vault.on('create', file => { if (file instanceof TFile && file.extension === 'md' && this.included(file)) this.scheduleIndex(); }));
         this.registerEvent(this.app.vault.on('delete', file => { if (file instanceof TFile && file.extension === 'md') this.scheduleIndex(); }));
-        this.registerEvent(this.app.vault.on('rename', file => { if (!(file instanceof TFile) || file.extension === 'md') { this.graphKey = ''; this.scheduleIndex(); } }));
+        this.registerEvent(this.app.vault.on('rename', (file, oldPath) => { this.catalogRenameQueue = this.catalogRenameQueue.then(() => renameCatalogSources(this, oldPath, file.path)).catch(e => this.fail(t('更新索引来源'), e)); if (!(file instanceof TFile) || file.extension === 'md') { this.graphKey = ''; this.scheduleIndex(); } }));
         this.registerEvent(this.app.workspace.on('editor-change', (editor, info) => {
             if (info?.file) {
                 this.dirty.set(info.file.path, true);
@@ -299,7 +303,7 @@ export default class AcademicNotes extends Plugin {
             for (const note of notes) {
                 const labels = JSON.stringify([note.records.map(r => [r.key, r.id, r.number, r.referenced]), note.refs.map(r => [r.targetPath, r.target && Engine.refText(r.target, this.settings)])]);
                 const previous = this.renderStates.get(note.path);
-                if (allViews || !previous || previous.source !== note.source || previous.labels !== labels) affected.add(note.path);
+                if (allViews || changed && note.source.includes('<!-- academic-notes:index:start') || !previous || previous.source !== note.source || previous.labels !== labels) affected.add(note.path);
                 this.renderStates.set(note.path, { source: note.source, labels });
             }
             this.graphKey = graphKey; this.renderKey = renderKey;
@@ -361,6 +365,7 @@ export default class AcademicNotes extends Plugin {
             traceLayout(el, 'reading.render');
             const n = this.graph?.notes.get(ctx.sourcePath);
             if (n) renderFragment(el, n, this.graph, node => ctx.getSectionInfo(node) || ctx.getSectionInfo(el));
+            void showCatalogStatus(this, el, ctx).catch(e => this.recordError(t('检查索引状态'), e));
             layout?.refresh();
         };
         class Reader extends MarkdownRenderChild {
@@ -436,13 +441,8 @@ export default class AcademicNotes extends Plugin {
             new Notice(t("该块已有 ID：^") + r.id);
             return;
         }
-        let id;
-        do {
-            id = 'an-' + Math.random().toString(36).slice(2, 10);
-        } while (note.blocks.has(id));
-        const prefix = r.kind === 'equation' || r.diagram ? Engine.quote(note.lines[r.endLine]).prefix : (r.depth > 1 ? '> '.repeat(r.depth - 1) : '');
-        const insertion = '\n' + prefix + '\n' + prefix + '^' + id + '\n';
-        editor.replaceRange(insertion, { line: r.endLine, ch: note.lines[r.endLine].length });
+        const insertion = labelInsertion(editor.getValue(), r, this.settings), id = insertion.id;
+        editor.replaceRange(insertion.text, { line: r.endLine, ch: note.lines[r.endLine].length });
         this.scheduleIndex();
         new Notice(t('已添加 ^{0}；可用 [[#^{0}]] 引用。', id));
     }
@@ -466,7 +466,31 @@ export default class AcademicNotes extends Plugin {
         }
     }
     makeReference(record: SourceRecord, sourcePath: string) { const target = record.path === sourcePath ? '' : record.path.replace(/\.md$/i, ''); return '[[' + target + '#^' + record.id + ']]'; }
-    targets() { return this.graph ? [...this.graph.notes.values()].flatMap(n => n.records.filter(r => r.id)) : []; }
+    async insertReference(editor: Editor, file: TFile, target: SourceRecord, from = editor.getCursor('from'), to = editor.getCursor('to')) {
+        const initial = editor.getValue(), start = editor.posToOffset(from), end = editor.posToOffset(to);
+        const original = this.graph?.notes.get(target.path)?.source;
+        const targetFile = this.app.vault.getAbstractFileByPath(target.path);
+        if (original === undefined || !(targetFile instanceof TFile)) throw new Error(t('目标笔记不存在'));
+        let resolved: SourceRecord;
+        const update = (source: string) => {
+            resolved = currentRecord(source, original, target, this.settings);
+            const insertion = resolved.id ? undefined : labelInsertion(source, resolved, this.settings);
+            if (insertion) resolved = { ...resolved, id: insertion.id, ids: [insertion.id] };
+            const edits = insertion ? [{ from: insertion.at, to: insertion.at, text: insertion.text }] : [];
+            if (target.path === file.path) edits.push({ from: start, to: end, text: this.makeReference(resolved, file.path) });
+            for (const edit of edits.sort((a,b) => b.from - a.from)) source = source.slice(0, edit.from) + edit.text + source.slice(edit.to);
+            return source;
+        };
+        if (target.path === file.path) replaceBuffer(editor, update(initial));
+        else {
+            await editNote(this, targetFile, update);
+            const attached = this.app.workspace.getLeavesOfType('markdown').some(leaf => leaf.view instanceof MarkdownView && leaf.view.editor === editor && leaf.view.file?.path === file.path);
+            if (!attached || editor.getValue() !== initial) throw new Error(t('目标标签已准备好，但当前笔记已变化，请重新插入引用。'));
+            editor.replaceRange(this.makeReference({ ...resolved!, path: targetFile.path }, file.path), from, to);
+        }
+        this.dirty.set(target.path, true); this.dirty.set(file.path, true); this.scheduleIndex();
+    }
+    targets(labelledOnly = true) { return this.graph ? [...this.graph.notes.values()].flatMap(n => n.records.filter(r => !labelledOnly || r.id)) : []; }
     pluginDir() { return this.manifest.dir || normalizePath(this.app.vault.configDir + '/plugins/' + this.manifest.id); }
     async mkdir(folder: string) { let p = ''; for (const part of safeFolder(folder).split('/')) {
         p += (p ? '/' : '') + part;
@@ -477,7 +501,8 @@ export default class AcademicNotes extends Plugin {
         const file = sourceFile || this.app.workspace.getActiveFile();
         if (!(file instanceof TFile) || file.extension !== 'md')
             throw new Error(t("请先打开一篇 Markdown 笔记。"));
-        const fm: Record<string, unknown> = this.app.metadataCache.getFileCache(file)?.frontmatter || {};
+        const source = noteEditor(this, file)?.getValue() ?? await this.app.vault.cachedRead(file);
+        const fm = frontmatter(source).data;
         const rawBook = isBook ? fm['phb-book'] : null;
         const book = rawBook && typeof rawBook === 'object' ? rawBook as Record<string, unknown> : undefined;
         if (isBook && !Array.isArray(book?.files))
@@ -517,24 +542,31 @@ export default class AcademicNotes extends Plugin {
             new Notice(t("已有导出任务正在运行。"));
             return;
         }
+        if (selection.options.book) {
+            try { if (!await reviewBookReferences(this, selection)) return; } catch (e) { this.fail(t('检查学术引用'), e); return; }
+            if (this.busy) { new Notice(t('已有导出任务正在运行。')); return; }
+        }
         this.busy = true;
         if (pdf) this.lastPdfExport = { status: 'running', time: new Date().toISOString() };
-        const log = new ProgressModal(this.app, pdf ? t("导出 PDF") : t("生成 HTML 快照"));
+        const controller = new AbortController(); this.pdfJobs.add(controller);
+        const check = () => { if (controller.signal.aborted) throw new Error(t('导出已取消。')); };
+        const log = new ProgressModal(this.app, pdf ? t("导出 PDF") : t("生成 HTML 快照"), () => controller.abort());
         log.open();
         try {
             await this.rebuild();
             log.line(t("正在完整渲染所选章节…"));
-            const snapshot = await this.snapshot(selection, log);
+            check();
+            const snapshot = await this.snapshot(selection, log, controller.signal);
+            check();
             log.line(t("HTML 快照已保存：") + snapshot);
             if (pdf) {
                 const out = snapshot.replace(/\.phb\.html$/, '.pdf');
-                const controller = new AbortController();
-                this.pdfJobs.add(controller);
                 try {
                     const html = await this.app.vault.adapter.read(snapshot);
                     const result = await exportPdf(html, line => log.line(line), controller.signal, undefined, { mode: this.settings.pdfFloatMode, maxRounds: this.settings.pdfFloatMaxRounds, kp: this.settings.kpPdf });
                     if (!this.active)
                         throw new Error(t("插件已停用。"));
+                    check();
                     await this.app.vault.adapter.writeBinary(out, new Uint8Array(result.bytes).buffer);
                     await this.app.vault.adapter.write(out.replace(/\.pdf$/, '.report.json'), JSON.stringify(result.report, null, 2));
                     this.lastPdfExport = { status: 'success', time: new Date().toISOString(), output: out, report: result.report };
@@ -560,6 +592,7 @@ export default class AcademicNotes extends Plugin {
             log.done();
         }
         catch (e) {
+            if (controller.signal.aborted) { if (pdf) this.lastPdfExport = {status:'cancelled', time:new Date().toISOString()}; log.line(t('导出已取消。')); log.done(); return; }
             if (pdf) this.lastPdfExport = { status: 'failed', time: new Date().toISOString(), message: String(e instanceof Error ? e.message : e) };
             log.line(t("错误：") + (e instanceof Error ? e.message : String(e)));
             log.line(t("查看完整错误：命令面板 → 检查插件状态与导出环境 → errors；可保存诊断 JSON。"));
@@ -567,6 +600,7 @@ export default class AcademicNotes extends Plugin {
             this.fail(t("导出"), e);
         }
         finally {
+            this.pdfJobs.delete(controller);
             this.busy = false;
         }
     }
@@ -611,9 +645,12 @@ export default class AcademicNotes extends Plugin {
             return raw.replace(/^([ \t]*(?:>[ \t]*)+\[!(?:proof|pf)(?:\|[^\]]*)?\][+-]?)(?=\[\[)/i, '$1 ');
         }).join('\n');
     }
-    async snapshot({ files, options }: ExportSelection, log: ProgressModal) {
+    async snapshot({ files, options }: ExportSelection, log: ProgressModal, signal?: AbortSignal) {
+        const check = () => { if (signal?.aborted) throw new Error(t('导出已取消。')); };
+        check();
         const warnings: string[] = [], notes: ParsedNote[] = [];
         for (const { file: f } of files) {
+            check();
             const existing = this.graph?.notes.get(f.path);
             const source = existing?.source ?? await this.app.vault.cachedRead(f);
             notes.push(Engine.parse(f.path, source, this.app.metadataCache.getFileCache(f) || {}, this.settings));
@@ -648,6 +685,7 @@ export default class AcademicNotes extends Plugin {
         component.load();
         try {
             for (let i = 0; i < files.length; i++) {
+                check();
                 const { file: f, title } = files[i], note = notes[i], section = doc.win.createEl('section');
                 section.className = 'phb-chapter';
                 section.dataset.path = f.path;
@@ -659,7 +697,8 @@ export default class AcademicNotes extends Plugin {
                 stage.appendChild(section);
                 await MarkdownRenderer.render(this.app, this.exportSource(note, graph), section, f.path, component);
                 await Obs.finishRenderMath();
-                await waitForTikz(section, 60000, () => this.active);
+                await waitForTikz(section, 60000, () => this.active && !signal?.aborted);
+                check();
                 // Map declaration anchors to their actual rendered boxes/equations.
                 const boxes = [...section.querySelectorAll<HTMLElement>('.callout[data-callout]')], math = [...section.querySelectorAll<HTMLElement>('mjx-container[display="true"]')];
                 const diagrams = [...section.querySelectorAll<HTMLElement>('.an-diagram-block')];
@@ -724,7 +763,9 @@ export default class AcademicNotes extends Plugin {
             DocCore.unfold(stage);
             await doc.fonts.ready;
             await this.waitStable(stage);
-            await this.inlineImages(stage);
+            check();
+            await this.inlineImages(stage, signal);
+            check();
             stage.querySelectorAll<HTMLElement>('.an-uniform-height').forEach(updateFigureImageRatio);
             if (stage.querySelector('[data-mml-node="merror"],mjx-merror'))
                 throw new Error(t("检测到数学渲染错误，已停止 PDF 导出；请先检查原公式。"));
@@ -743,7 +784,7 @@ export default class AcademicNotes extends Plugin {
                 }
             } });
             const baseCss = calloutCss + '\n' + layoutCss + '\n' + diagramCss + '\n' + typographyCss + '\n' + algorithmCss, printCss = documentCss;
-            let css = this.settings.captureTheme ? await this.collectCss(doc, meta.warnings) : baseCss;
+            let css = this.settings.captureTheme ? await this.collectCss(doc, meta.warnings, signal) : baseCss;
             const bodyStyle = doc.defaultView!.getComputedStyle(doc.body), variables = [...bodyStyle].filter(k => k.startsWith('--')).map(k => `${k}:${bodyStyle.getPropertyValue(k)};`).join('');
             const classes = [...doc.body.classList].filter(c => !['is-mobile', 'is-phone'].includes(c)).join(' ') + ' phb-export';
             stage.querySelectorAll('script,iframe,object,embed,form,audio,video').forEach(e => e.remove());
@@ -757,6 +798,7 @@ export default class AcademicNotes extends Plugin {
         // eslint-disable-next-line no-control-regex -- Reject Windows filename control characters.
             const safe = String(options.title || 'Book').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').slice(0, 80), stamp = new Date().toISOString().replace(/[:.]/g, '-');
             const path = folder + '/' + safe + '-' + stamp + '.phb.html';
+            check();
             await this.app.vault.adapter.write(path, html);
             await this.app.vault.adapter.write(path + '.report.json', JSON.stringify(meta, null, 2));
             return path;
@@ -767,7 +809,7 @@ export default class AcademicNotes extends Plugin {
         }
     }
     async waitStable(stage: HTMLElement) { await new Promise<void>(resolve => { let quiet: number, limit: number; const done = () => { window.clearTimeout(quiet); window.clearTimeout(limit); o.disconnect(); resolve(); }; const o = new MutationObserver(() => { window.clearTimeout(quiet); quiet = window.setTimeout(done, 400); }); o.observe(stage, { childList: true, subtree: true }); quiet = window.setTimeout(done, 400); limit = window.setTimeout(done, 8000); }); }
-    async inlineImages(stage: HTMLElement) {
+    async inlineImages(stage: HTMLElement, signal?: AbortSignal) {
         for (const canvas of [...stage.querySelectorAll('canvas')]) {
             const img = stage.ownerDocument.win.createEl('img');
             img.src = canvas.toDataURL('image/png');
@@ -776,6 +818,7 @@ export default class AcademicNotes extends Plugin {
             canvas.replaceWith(img);
         }
         for (const img of stage.querySelectorAll('img')) {
+            if (signal?.aborted) throw new Error(t('导出已取消。'));
             const url = img.currentSrc || img.src;
             if (url.startsWith('data:'))
                 continue;
@@ -784,12 +827,13 @@ export default class AcademicNotes extends Plugin {
             let data;
             try {
                 // Local app/file/blob URLs require Chromium; requestUrl is for HTTP requests.
-                const r = await stage.ownerDocument.win.fetch(url);
+                const r = await stage.ownerDocument.win.fetch(url, { signal });
                 if (!r.ok)
                     throw new Error(String(r.status));
                 data = await dataUrl(await r.blob());
             }
             catch {
+                if (signal?.aborted) throw new Error(t('导出已取消。'));
                 const src = img.closest('.image-embed')?.getAttribute('src') || img.getAttribute('data-src');
                 const path = img.closest<HTMLElement>('.phb-chapter')?.dataset.path || '';
                 const file = src && this.app.metadataCache.getFirstLinkpathDest(src, path);
@@ -811,9 +855,10 @@ export default class AcademicNotes extends Plugin {
             }
         }
     }
-    async collectCss(doc: Document, warnings: string[]) {
+    async collectCss(doc: Document, warnings: string[], signal?: AbortSignal) {
         const seen = new Set(), chunks: string[] = [], cache = new Map<string, string>();
         async function resource(url: string, base: string | null) {
+            if (signal?.aborted) throw new Error(t('导出已取消。'));
             if (url.startsWith('data:') || url.startsWith('#') || !url)
                 return url;
             let absolute;
@@ -830,7 +875,7 @@ export default class AcademicNotes extends Plugin {
                 return url;
             }
             try {
-                const r = await doc.win.fetch(absolute);
+                const r = await doc.win.fetch(absolute, {signal});
                 if (!r.ok)
                     throw new Error(String(r.status));
                 const data = await dataUrl(await r.blob());
@@ -838,6 +883,7 @@ export default class AcademicNotes extends Plugin {
                 return data;
             }
             catch {
+                if (signal?.aborted) throw new Error(t('导出已取消。'));
                 warnings.push(t("未能内嵌 CSS 资源，可能影响字体/背景：") + absolute);
                 return url;
             }

@@ -1,3 +1,12 @@
+# 2.15.3 Academic writing workflows
+
+- 52 Node regressions cover manifest frontmatter/body preservation, catalog rename boundaries, unique target relocation, retired-environment numbering/profile compatibility, parallel-arrow data validation, and all existing index/rendering cases.
+- Real CodeMirror/browser regressions exercise cross-file and same-file ID insertion into unsaved buffers, manifest save/reopen, excluded-chapter preflight, reviewed environment deletion, cancellation during snapshot preparation, and distinct parallel paths with rendered math labels.
+- Isolated WebKit tests pass at portrait and landscape viewports. They cover native title ownership, editor scrolling, selection, IME events, resizing, KP, passive touch scheduling, diagrams and new workspace workflows. Tests accommodate WebKit clearing native selection when contenteditable is removed and explicitly bring test paragraphs into view.
+- Full Phycat/Electron regressions pass 15 palettes, 13 PDF pages and 35 internal links, 84 optimized paragraphs with no fit fallback, algorithm pagination and picture-float rollback. Focused UI tests are repeated for the final workflow changes.
+- The running Obsidian instance loads 2.15.3, exposes the manifest editor's save/load/check/HTML/PDF controls, and reports no plugin errors. Native verification does not save user notes or preferences.
+- Physical iPad acceptance remains outstanding. Use examples/mobile-acceptance.md; WebKit automation is not a claim that the reported Obsidian/iPad scrolling freeze is fixed.
+
 # 2.15.2 Reference tools, Markdown indexes and shared profiles
 
 - 47 Node regressions pass. Added cases cover ordinary and ambiguous block links, duplicate IDs, numbering scopes, excluded and out-of-book targets, safe managed-region updates, profile allowlists/conflicts and rejected executable-style color inputs. A 1,001-note fixture reuses unchanged parses, refreshes only affected/dependent reading fragments, and skips duplicate graph work. An asynchronous-read test verifies that edits arriving during indexing are not lost.

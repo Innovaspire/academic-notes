@@ -1,5 +1,5 @@
 export interface DiagramNode { id: string; row: number; col: number; label: string }
-export interface DiagramArrow { id: string; from: string; to: string; label: string; style: 'solid' | 'dashed'; side: 'above' | 'below' }
+export interface DiagramArrow { id: string; from: string; to: string; label: string; style: 'solid' | 'dashed'; side: 'above' | 'below'; head?: 'normal' | 'injective' | 'surjective' | 'isomorphism'; curve?: -1 | 0 | 1 }
 export interface DiagramCommutation { id: string; from: string; via: string; to: string }
 export interface DiagramData { version: 1; grid: 2 | 3; nodes: DiagramNode[]; arrows: DiagramArrow[]; caption?: string; commutations?: DiagramCommutation[] }
 export const emptyDiagram = (): DiagramData => ({ version: 1, grid: 2, nodes: [], arrows: [] });
@@ -24,7 +24,8 @@ export function parseDiagram(source: string): DiagramData {
     const ids = new Set(nodes.map(n => n.id));
     const arrows = value.arrows.map(a => {
         if (!a || !ids.has(a.from) || !ids.has(a.to) || a.from === a.to || !['solid', 'dashed'].includes(a.style) || !['above', 'below'].includes(a.side)) throw new Error('Invalid diagram arrow.');
-        return { id: id(a.id), from: a.from, to: a.to, label: label(a.label), style: a.style, side: a.side };
+        if (a.head !== undefined && !['normal','injective','surjective','isomorphism'].includes(a.head) || a.curve !== undefined && ![-1,0,1].includes(a.curve)) throw new Error('Invalid arrow shape.');
+        return { id: id(a.id), from: a.from, to: a.to, label: label(a.label), style: a.style, side: a.side, ...(a.head === undefined ? {} : {head:a.head}), ...(a.curve === undefined ? {} : {curve:a.curve}) };
     });
     if (new Set(arrows.map(a => a.id)).size !== arrows.length) throw new Error('Duplicate diagram arrow.');
     const data: DiagramData = { version: 1, grid: value.grid as 2 | 3, nodes, arrows, ...(value.caption === undefined ? {} : { caption: label(value.caption) }) };

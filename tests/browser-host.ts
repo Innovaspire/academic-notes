@@ -42,7 +42,8 @@ export class Modal {
   constructor(public app: any) {}
   onOpen() {}
   open() { this.onOpen(); }
-  close() { this.modalEl.remove(); }
+  onClose() {}
+  close() { this.modalEl.remove(); this.onClose(); }
 }
 export class Setting {
   settingEl: HTMLElement; nameEl: HTMLElement; descEl: HTMLElement;

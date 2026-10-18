@@ -14,8 +14,8 @@ Inspired by [ElegantBook](https://github.com/ElegantLaTeX/ElegantBook), Academic
 
 - **Mathematical environments** — theorems, definitions, lemmas, propositions, proofs, remarks, and more, with support for folding and nesting.
 - **Flexible numbering** — automatic or manual numbers, section-based or continuous counters, shared theorem counters, and an option to number only referenced equations.
-- **Cross-file references** — readable labels, reference suggestions, customizable names and abbreviations, and links that follow their targets into a PDF book.
-- **Your own environments** — add named environments with their own numbering, references, colors, and corner motifs.
+- **Cross-file references** — readable labels, reference suggestions that can label new targets, customizable names and abbreviations, and links that follow their targets into a PDF book.
+- **Your own environments** — add named environments with their own numbering, references, colors, and corner motifs; inspect usage or retire them from insertion.
 
 [Explore mathematical environments](https://github.com/Kristal-Boltinn/academic-notes/wiki/Mathematical-environments) · [References and indexes](https://github.com/Kristal-Boltinn/academic-notes/wiki/References-and-indexes)
 
@@ -25,7 +25,7 @@ Algorithms use the familiar pseudocode.js / LaTeX algorithmic grammar, with a th
 
 ![A numbered algorithm with mathematical notation](screenshots/algorithm.png)
 
-Figures, subfigures, and three-line tables have coordinated captions and references. Subfigure groups support shared image heights and balanced layouts. The built-in commutative diagram editor **(Beta)** provides grid-based nodes, math labels, arrows, and triangular commutativity markers. Optional TikZJax integration preserves completed drawings in exports.
+Figures, subfigures, and three-line tables have coordinated captions and references. Subfigure groups support shared image heights and balanced layouts. The built-in commutative diagram editor **(Beta)** provides grid-based nodes, math labels, parallel and curved arrows, injection/surjection/isomorphism notation, and triangular commutativity markers. Optional TikZJax integration preserves completed drawings in exports.
 
 [Algorithms](https://github.com/Kristal-Boltinn/academic-notes/wiki/Algorithms) · [Figures and tables](https://github.com/Kristal-Boltinn/academic-notes/wiki/Figures-and-tables) · [Diagrams and TikZ](https://github.com/Kristal-Boltinn/academic-notes/wiki/Diagrams-and-TikZ)
 
@@ -41,10 +41,10 @@ Optional paragraph indentation and Knuth–Plass line breaking **(Beta)** refine
 
 ## Navigate, check, and publish
 
-- **Linked Markdown indexes** — collect academic content by environment or source note into an ordinary note, with clickable links and refreshable contents.
+- **Linked Markdown indexes** — collect academic content by environment or source note into an ordinary note, with clickable links, rename-aware sources, and refreshable contents.
 - **Reference checks** — find missing or ambiguous targets, duplicate block IDs, numbering conflicts, and references outside a selected book.
 - **Contents and PDF navigation** — clickable tables of contents, bookmarks, measured page numbers, and internal links.
-- **Single notes and books** — export HTML snapshots or desktop PDFs, combine chapters, and renumber the export without rewriting source notes.
+- **Single notes and books** — export HTML snapshots or desktop PDFs, save and reopen chapter manifests, review references, cancel exports, and renumber the export without rewriting source notes.
 - **Page-aware figures** — keep images and captions together, with optional experimental shrinking and limited paragraph movement to reduce page gaps.
 
 ![A multi-note book exported to PDF](screenshots/book-export.png)

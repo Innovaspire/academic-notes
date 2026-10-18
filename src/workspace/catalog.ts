@@ -8,24 +8,41 @@ export interface CatalogOptions {
     types: string[];
     group: 'type' | 'file';
     unnumbered: boolean;
+    folder?: string;
+    generatedAt?: string;
 }
 export const CATALOG_START = '<!-- academic-notes:index:start';
 export const CATALOG_END = '<!-- academic-notes:index:end -->';
-const region = /<!-- academic-notes:index:start\s*\n([^]*?)\n-->[^]*?<!-- academic-notes:index:end -->/g;
+const region = /^<!-- academic-notes:index:start[ \t]*\r?\n([^]*?)\r?\n-->[^]*?^<!-- academic-notes:index:end -->[ \t]*\r?$/gm;
+function catalogMask(source: string) {
+    let fence = '';
+    return source.split('\n').map(line => {
+        const marker = line.match(/^[ \t]*(`{3,}|~{3,})(.*)$/);
+        if (!fence && marker) { fence = marker[1]; return ' '.repeat(line.length); }
+        if (fence) {
+            if (marker && marker[1][0] === fence[0] && marker[1].length >= fence.length && !marker[2].trim()) fence = '';
+            return ' '.repeat(line.length);
+        }
+        return line;
+    }).join('\n');
+}
 function onlyRegion(source: string) {
-    const matches = [...source.matchAll(region)];
-    if (matches.length !== 1 || source.split(CATALOG_START).length !== 2 || source.split(CATALOG_END).length !== 2)
+    const mask = catalogMask(source), matches = [...mask.matchAll(region)];
+    if (matches.length !== 1 || mask.split(CATALOG_START).length !== 2 || mask.split(CATALOG_END).length !== 2)
         throw new Error(t('索引标记缺失或重复；为保护手写内容，请生成新的索引笔记。'));
+    matches[0][0] = source.slice(matches[0].index, matches[0].index + matches[0][0].length);
     return matches[0];
 }
 export function readCatalog(source: string): CatalogOptions | null {
-    if (!source.includes(CATALOG_START)) return null;
+    if (!catalogMask(source).includes(CATALOG_START)) return null;
     const match = onlyRegion(source);
     let data: CatalogOptions;
     try { data = JSON.parse(match[1]) as CatalogOptions; } catch { throw new Error(t('索引配置无效。')); }
     if (data?.version !== 1 || !['note', 'folder', 'vault', 'book'].includes(data.scope) || typeof data.source !== 'string' || data.source.length > 2000 ||
         !['type', 'file'].includes(data.group) || typeof data.unnumbered !== 'boolean' || !Array.isArray(data.types) || data.types.length > 100 ||
-        data.types.some(key => typeof key !== 'string' || !/^[a-z][a-z0-9-]{0,39}$/.test(key))) throw new Error(t('索引配置无效。'));
+        data.types.some(key => typeof key !== 'string' || !/^[a-z][a-z0-9-]{0,39}$/.test(key)) ||
+        data.folder !== undefined && (typeof data.folder !== 'string' || data.folder.length > 2000) ||
+        data.generatedAt !== undefined && (typeof data.generatedAt !== 'string' || !Number.isFinite(Date.parse(data.generatedAt)))) throw new Error(t('索引配置无效。'));
     return data;
 }
 const label = (text: string) => text.replace(/[\r\n|[\]<>]/g, ' ').trim();
@@ -64,4 +81,16 @@ export function renderCatalog(options: CatalogOptions, body: string) {
 export function updateCatalog(source: string, options: CatalogOptions, body: string) {
     const match = onlyRegion(source), next = renderCatalog(options, body);
     return source.slice(0, match.index) + next + source.slice(match.index + match[0].length);
+}
+export function catalogContent(source: string) {
+    const match = onlyRegion(source);
+    return match[0].slice(match[0].indexOf('\n-->') + 4, match[0].lastIndexOf(CATALOG_END)).trim();
+}
+export function remapCatalog(source: string, oldPath: string, newPath: string) {
+    const options = readCatalog(source); if (!options) return source;
+    const move = (path: string) => path === oldPath ? newPath : path.startsWith(oldPath + '/') ? newPath + path.slice(oldPath.length) : path;
+    if (options.scope === 'folder' && options.folder === undefined) options.folder = options.source.slice(0, options.source.lastIndexOf('/') + 1).replace(/\/$/, '');
+    const next = { ...options, source: move(options.source), ...(options.folder === undefined ? {} : { folder: move(options.folder) }) };
+    if (next.source === options.source && next.folder === options.folder) return source;
+    return updateCatalog(source, next, catalogContent(source));
 }

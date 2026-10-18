@@ -39,8 +39,10 @@ export async function runKpLiveRegressions() {
         check(view.state.doc.toString() === source, 'layout must preserve exact source');
         for (const line of view.dom.querySelectorAll('.cm-line')) if (line.textContent?.includes('$x+y$')) check(!line.querySelector('.an-kp-live-break'), 'inline math/link paragraphs must remain native');
         const englishFrom = source.indexOf(prose), chineseFrom = source.indexOf(chinese);
+        view.dispatch({effects:EditorView.scrollIntoView(chineseFrom + 1,{y:'center'})}); await settle(); await settle();
         const chineseNode = view.domAtPos(chineseFrom + 1).node;
         check((chineseNode.nodeType === 1 ? chineseNode as HTMLElement : chineseNode.parentElement)?.closest('.cm-line')?.querySelector('.an-kp-live-break'), 'visible CJK prose must get optimized breaks');
+        view.dispatch({effects:EditorView.scrollIntoView(englishFrom + 1,{y:'start'})}); await settle(); await settle();
         const breaks = () => view.dom.querySelectorAll('.an-kp-live-break').length;
         plugin.settings.paragraphIndent = true; view.dispatch({ effects: plugin.refreshEffect.of(110) }); await settle(); await settle();
         const indentNode = view.domAtPos(englishFrom+1).node;

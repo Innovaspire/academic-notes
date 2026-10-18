@@ -1,4 +1,4 @@
-import { Setting, Notice } from 'obsidian';
+import { Setting, Notice, Modal } from 'obsidian';
 import { t } from '../i18n';
 import Engine from '../indexing/engine';
 import { ENVIRONMENT_STYLES, type CustomEnvironment } from '../indexing/environments';
@@ -35,6 +35,7 @@ export function renderEnvironmentSettings(container: HTMLElement, plugin: Academ
         if (isNew || custom) {
             new Setting(form).setName(t('基础外观')).addDropdown(d => d.addOptions(Object.fromEntries(ENVIRONMENT_STYLES.map(style => [style, Engine.TYPES[style][0]]))).setValue(entry.style).onChange(value => { entry.style = value as CustomEnvironment['style']; }));
             new Setting(form).setName(t('自动编号')).addToggle(c => c.setValue(entry.numbered).onChange(value => { entry.numbered = value; }));
+            new Setting(form).setName(t('停用新建入口')).setDesc(t('保留已有环境的编号、样式和引用，只从插入环境菜单隐藏。')).addToggle(c => c.setValue(!!entry.retired).onChange(value => { entry.retired = value; }));
             form.createEl('p', { text: t('保存新环境后，可在本页调整颜色和图标；编号规则在独立的编号设置中。') });
             if (custom) form.createEl('p', { cls: 'an-environment-example', text: `> [!${selected}] ${t('标题')}\n> ${t('正文')}\n\n^${selected}-example` });
         }
@@ -54,13 +55,32 @@ export function renderEnvironmentSettings(container: HTMLElement, plugin: Academ
             const all = Engine.referenceOverrides(plugin.settings); delete all[selected]; plugin.settings.referenceOverrides = JSON.stringify(all);
             await plugin.saveSettings(); draw();
         }));
-        if (custom) actions.addButton(b => b.setButtonText(t('删除环境')).onClick(async () => {
+        const remove = async () => {
             const current = Engine.environments(plugin.settings); delete current[selected];
             plugin.settings.customEnvironments = JSON.stringify(current);
             const refs = Engine.referenceOverrides(plugin.settings); delete refs[selected]; plugin.settings.referenceOverrides = JSON.stringify(refs);
             const palettes = paletteOverrides(plugin.settings); for (const profile of Object.values(palettes)) delete profile[selected]; plugin.settings.paletteAppearance = JSON.stringify(palettes);
             await plugin.saveSettings(); selected = 'algorithm'; draw();
-        }));
+        };
+        if (custom) {
+            const inspect = async (deleting: boolean) => {
+                await plugin.rebuild();
+                const records = [...plugin.graph!.notes.values()].flatMap(note => note.records.filter(r => r.key === selected));
+                const paths = [...new Set(records.map(r => r.path))];
+                const key = selected, definition = JSON.stringify(Engine.environments(plugin.settings)[key]);
+                const modal = new Modal(plugin.app); modal.titleEl.setText(t('环境使用情况'));
+                modal.contentEl.createEl('p', { text: t('此环境用于 {0} 篇已索引笔记，共 {1} 个块。', paths.length, records.length) });
+                modal.contentEl.createEl('p', { text: t('排除索引的笔记不在统计内。删除定义会移除编号和样式，但保留 Markdown 原文；也可停用新建入口。') });
+                for (const path of paths) new Setting(modal.contentEl).setName(path).addButton(b => b.setButtonText(t('定位')).onClick(() => { modal.close(); void plugin.app.workspace.openLinkText(path, '').catch(e => plugin.fail(t('定位'), e)); }));
+                if (deleting) new Setting(modal.contentEl).addButton(b => b.setButtonText(t('删除定义，保留笔记')).onClick(async () => {
+                    if (selected !== key || JSON.stringify(Engine.environments(plugin.settings)[key]) !== definition) { new Notice(t('设置已变化，请重新查看使用情况。')); return; }
+                    try { await remove(); modal.close(); } catch (e) { plugin.fail(t('删除环境'), e); }
+                }));
+                modal.open();
+            };
+            actions.addButton(b => b.setButtonText(t('查看使用位置')).onClick(() => { void inspect(false).catch(e => plugin.fail(t('环境使用情况'), e)); }));
+            actions.addButton(b => b.setButtonText(t('删除环境')).onClick(() => { void inspect(true).catch(e => plugin.fail(t('环境使用情况'), e)); }));
+        }
         if (!isNew) editor.renderAppearance?.(form);
         for (const [node,top] of scrolls) node.scrollTop=top;
     };

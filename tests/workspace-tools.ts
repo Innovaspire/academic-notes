@@ -7,6 +7,60 @@ import { setLanguage } from '../src/i18n';
 import { auditReferences } from '../src/workspace/audit';
 import { catalogBody, readCatalog, renderCatalog, updateCatalog, type CatalogOptions } from '../src/workspace/catalog';
 import { exportProfile, parseProfile, mergeProfile } from '../src/workspace/profiles';
+import { frontmatter, saveBookSource, currentRecord, labelInsertion } from '../src/workspace/notes';
+import { remapCatalog, catalogContent } from '../src/workspace/catalog';
+import { parseDiagram } from '../src/diagrams/model';
+import { arrowBend } from '../src/diagrams/geometry';
+
+test('saved book manifests round-trip titles and preserve unrelated properties and handwritten body', () => {
+    const book = {title:'Analysis: notes',subtitle:'练习',tocDepth:3,files:[{path:'Chapter one.md',title:'Chapter: one'}]};
+    const initial = '---\ntags: [math]\nphb-book:\n  files: [Old.md]\n  custom: keep\n---\n# Handwriting\n\nKeep this.\n';
+    const next = saveBookSource(initial, book, true), parsed = frontmatter(next).data;
+    assert.deepEqual(parsed.tags,['math']); assert.deepEqual(parsed['phb-book'],{...book,custom:'keep'});
+    assert.ok(next.endsWith('# Handwriting\n\nKeep this.\n'));
+    assert.deepEqual(frontmatter(saveBookSource('',book)).data['phb-book'],book);
+    assert.throws(()=>saveBookSource('An unrelated note',book,true));
+    assert.throws(()=>saveBookSource('---\nphb-book: hello\n---\n',book,true));
+});
+
+test('catalog source renames follow path boundaries and preserve annotations and list contents', () => {
+    const options: CatalogOptions = {version:1,scope:'folder',source:'Math/a.md',types:['thm'],group:'type',unnumbered:true,generatedAt:'2026-10-18T00:00:00Z'};
+    const text = 'Before\n' + renderCatalog(options,'- [[Math/a#^x]]') + '\nAfter';
+    const moved = remapCatalog(text,'Math','Analysis');
+    assert.equal(readCatalog(moved)?.source,'Analysis/a.md'); assert.equal(readCatalog(moved)?.folder,'Analysis');
+    assert.equal(catalogContent(moved),'- [[Math/a#^x]]'); assert.ok(moved.startsWith('Before\n')); assert.ok(moved.endsWith('\nAfter'));
+    assert.equal(remapCatalog(text,'Mat','Other'),text);
+    const example = '```markdown\n' + renderCatalog(options, 'Sample') + '\n```';
+    assert.equal(readCatalog(example),null); assert.equal(remapCatalog(example,'Math','Other'),example);
+    const fileMoved = remapCatalog(moved,'Analysis/a.md','Elsewhere/b.md');
+    assert.equal(readCatalog(fileMoved)?.folder,'Analysis'); assert.equal(readCatalog(fileMoved)?.source,'Elsewhere/b.md');
+});
+
+test('reference labelling relocates unique targets but rejects ambiguous edits and duplicate IDs', () => {
+    const source = '> [!thm] A\n> Body\n', record = Engine.parse('a.md',source).records[0];
+    const changed = 'Introduction\n\n' + source;
+    const current = currentRecord(changed,source,record,DEFAULTS), insert = labelInsertion(changed,current,DEFAULTS);
+    const labelled = changed.slice(0,insert.at)+insert.text+changed.slice(insert.at);
+    assert.equal(Engine.parse('a.md',labelled).records[0].id,insert.id);
+    assert.throws(()=>currentRecord(source+'\n'+source,source,record,DEFAULTS));
+    assert.throws(()=>currentRecord('Replaced',source,record,DEFAULTS));
+});
+
+test('retired environments keep rendering, counters and profile compatibility', () => {
+    const settings = {...DEFAULTS,customEnvironments:JSON.stringify({observation:{name:'Observation',abbr:'obs',style:'thm',numbered:true,retired:true}})};
+    const note = Engine.parse('a.md','> [!observation] A\n> Body',{},settings); Engine.graph([note],settings);
+    assert.equal(note.records[0].number,'1'); assert.equal(note.records[0].environment?.retired,true);
+    assert.equal((parseProfile(exportProfile(settings)).settings.customEnvironments as any).observation.retired,true);
+});
+
+test('diagram arrows preserve old data and separate parallel and opposing edges', () => {
+    const old = {version:1,grid:2,nodes:[{id:'a',row:0,col:0,label:'A'},{id:'b',row:0,col:1,label:'B'}],arrows:[{id:'f',from:'a',to:'b',label:'f',style:'solid',side:'above'}]};
+    assert.deepEqual(parseDiagram(JSON.stringify(old)),old);
+    const data = parseDiagram(JSON.stringify({...old,arrows:[{...old.arrows[0],head:'injective',curve:0},{...old.arrows[0],id:'g',head:'surjective',side:'below'}]}));
+    assert.equal(arrowBend(data,data.arrows[0]),-arrowBend(data,data.arrows[1])); assert.notEqual(arrowBend(data,data.arrows[0]),0);
+    assert.throws(()=>parseDiagram(JSON.stringify({...old,arrows:[{...old.arrows[0],head:'script'}]})));
+    assert.throws(()=>parseDiagram(JSON.stringify({...old,arrows:[{...old.arrows[0],curve:99}]})));
+});
 
 test('reference checks distinguish ordinary anchors, duplicate IDs, excluded notes and out-of-book links', () => {
     const a = Engine.parse('a.md', 'Normal paragraph. ^normal\n\n> [!thm|1] One\n> Text\n\n^same\n\n> [!thm|1] Two\n> Text\n\n^same\n\n[[#^normal]] [[#^same]] [[missing#^x]] [[excluded#^x]] [[b#^b]] [[b#^gone]]\n\n`[[not-a-link#^x]]`');

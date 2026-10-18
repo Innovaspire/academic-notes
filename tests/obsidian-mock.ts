@@ -1,3 +1,4 @@
+export { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 export class Plugin {
   [key: string]: any;
   commands: any[] = [];

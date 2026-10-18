@@ -14,8 +14,8 @@
 
 - **数学环境**：提供定理、定义、引理、命题、证明、注记等环境，支持折叠和嵌套。
 - **灵活编号**：支持自动或手动编号、按节或全文连续计数、共享定理计数器，以及仅为被引用公式编号。
-- **跨文件引用**：提供易读的引用标签、插入建议和可自定义的名称与缩写；合订本 PDF 中保留内部跳转。
-- **自建环境**：创建自己的环境，设置编号、引用、颜色与角标。
+- **跨文件引用**：提供易读的引用标签、可为无标签对象补标签的插入建议和可自定义的名称与缩写；合订本 PDF 中保留内部跳转。
+- **自建环境**：创建自己的环境，设置编号、引用、颜色与角标，查看使用情况或停用新建入口。
 
 [数学环境](https://github.com/Kristal-Boltinn/academic-notes/wiki/Mathematical-environments-ZH) · [引用与学术索引](https://github.com/Kristal-Boltinn/academic-notes/wiki/References-and-indexes-ZH)
 
@@ -25,7 +25,7 @@
 
 ![带编号与数学公式的算法环境](screenshots/algorithm.png)
 
-图片、子图和三线表拥有协调的题注与引用。子图组支持统一图片高度和均衡布局。内置交换图编辑器 **（Beta）** 提供网格节点、数学标签、箭头与三角交换标记；可选 TikZJax 集成可将已渲染的绘图保留到导出文档中。
+图片、子图和三线表拥有协调的题注与引用。子图组支持统一图片高度和均衡布局。内置交换图编辑器 **（Beta）** 提供网格节点、数学标签、平行及弯曲箭头、单射／满射／同构与三角交换标记；可选 TikZJax 集成可将已渲染的绘图保留到导出文档中。
 
 [算法与伪代码](https://github.com/Kristal-Boltinn/academic-notes/wiki/Algorithms-ZH) · [图片与表格](https://github.com/Kristal-Boltinn/academic-notes/wiki/Figures-and-tables-ZH) · [交换图与 TikZ](https://github.com/Kristal-Boltinn/academic-notes/wiki/Diagrams-and-TikZ-ZH)
 
@@ -41,10 +41,10 @@
 
 ## 整理、检查与导出
 
-- **Markdown 学术索引**：按环境或来源笔记汇总学术内容，生成带普通内部链接、可刷新的索引笔记。
+- **Markdown 学术索引**：按环境或来源笔记汇总学术内容，生成带普通内部链接、可刷新的索引笔记，来源可跟随改名。
 - **引用检查**：查找失效或有歧义的目标、重复块 ID、编号冲突，以及合订本范围外的引用。
 - **目录与 PDF 导航**：提供可点击目录、书签、实际测量的页码和内部跳转。
-- **单篇与合订本**：导出 HTML 快照或桌面 PDF，将多篇笔记组成章节；导出中的重新编号不改写原笔记。
+- **单篇与合订本**：导出 HTML 快照或桌面 PDF，保存和重开章节清单，导出前检查引用，并可取消任务；导出中的重新编号不改写原笔记。
 - **图片跨页保护**：尽量保持图片与图注完整，并提供实验性的缩图与有限段落移动，减少页尾空白。
 
 ![多篇笔记导出的 PDF 合订本](screenshots/book-export.png)
