@@ -405,6 +405,7 @@ export const ENGLISH = {
   "{0}:{1} 含多个手写 tag，保留公式但不猜测整块引用编号。": "{0}:{1} Multiple explicit tags: preserve the equation without inferring a single reference number.",
   "{0}: 存在未闭合的 $$，最后一段不参与编号。": "{0}: Unclosed $$; the final block is not numbered.",
   "{0}: 重复块 ID ^{1}，不解析歧义引用。": "{0}: Duplicate block ID ^{1}; ambiguous references are not resolved.",
+  "{0}: 块 ID ^{1} 与同名 \\label 指向不同目标，不解析歧义引用。": "{0}: Block ID ^{1} and a \\label with the same name refer to different targets; ambiguous references are not resolved.",
   "{0}:{1} subfigure 不在 figure 内，仅显示题注，不猜测主图编号。": "{0}:{1} Subfigure outside a figure: show its caption without inferring a parent figure number.",
   "（未编号）": " (unnumbered)",
   "当前 Obsidian 未提供 Electron PDF 接口，请更新桌面安装程序。": "Obsidian's Electron PDF interface is unavailable. Update the desktop installer.",

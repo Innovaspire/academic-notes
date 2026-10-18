@@ -19,6 +19,8 @@ test('reference checks distinguish ordinary anchors, duplicate IDs, excluded not
     assert.equal(issues.find(issue => issue.code === 'duplicate-id')?.related?.line, 5);
     const duplicateOrdinary = Engine.parse('ordinary.md', 'A ^x\n\nB ^x\n\n[[#^x]]');
     assert.deepEqual(auditReferences(Engine.graph([duplicateOrdinary])).map(issue=>issue.code), ['duplicate-id','ambiguous-block']);
+    const labelCollision = Engine.parse('collide.md', '$$\nx=1 \\label{valid}\n$$\n\nOrdinary text ^valid\n\n[[#^valid]]');
+    assert.deepEqual(auditReferences(Engine.graph([labelCollision])).map(issue=>issue.code), ['ambiguous-block']);
 });
 test('reference checks respect numbering scopes and detect ambiguous filenames', () => {
     const note = Engine.parse('ref.md', '[[Other#^x]]\n\n## First\n\n> [!thm|1] First\n> A\n\n## Second\n\n> [!thm|1] Second\n> B');

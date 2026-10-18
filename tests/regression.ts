@@ -327,17 +327,105 @@ test('multiple labeled rows get independent numbers and aligned is upgraded for 
   assert.equal(Engine.taggedTex(note.equations[1], label => graph.resolveLabel(label, note.path)), '\\text{(1)}\\ \\text{(2)}');
 });
 
-test('row labels stay explicit under manual tags and disabled automatic numbering', () => {
+test('row labels follow their own row under manual tags and disabled automatic numbering', () => {
   const manual = Engine.parse('manual-row.md', '$$\\begin{align*}a &= b \\tag{A} \\\\ c &= d \\label{eq:c}\\end{align*}$$\n\n$$\\eqref{eq:c}$$');
   const manualGraph = Engine.graph([manual]);
   assert.equal(manual.equations[0].number, 'A');
   assert.equal(manual.equations[0].rowNumbers, undefined);
   assert.match(Engine.taggedTex(manual.equations[0], label => manualGraph.resolveLabel(label, manual.path)), /\\tag\{A\}/);
-  assert.equal(Engine.taggedTex(manual.equations[1], label => manualGraph.resolveLabel(label, manual.path)), '\\text{(A)}');
+  assert.equal(Engine.taggedTex(manual.equations[1], label => manualGraph.resolveLabel(label, manual.path)), '\\eqref{eq:c}');
   const off = Engine.parse('off-row.md', '$$\n\\begin{align*}\na &= b \\\\\nc &= d \\label{eq:c}\n\\end{align*}\n$$', {}, { equationMode: 'none' });
   Engine.graph([off], { equationMode: 'none' });
   assert.equal(off.equations[0].number, '1');
   assert.deepEqual(off.equations[0].rowNumbers, { 'eq:c': '1' });
+});
+
+test('row references use the selected row number, not the first row', () => {
+  const note = Engine.parse('row-ref.md', ['$$', '\\begin{align*}', 'a &= b \\label{first} \\\\', 'c &= d \\label{second}', '\\end{align*}', '$$', '', '[[#^second]]', '', '$$\\eqref{second}$$'].join('\n'));
+  const graph = Engine.graph([note]), eq = note.equations[0];
+  assert.deepEqual(eq.rowNumbers, { first: '1', second: '2' });
+  assert.equal(Engine.refText(eq, graph.settings, 'first'), 'eq:1');
+  assert.equal(Engine.refText(eq, graph.settings, 'second'), 'eq:2');
+  assert.equal(Engine.refText(eq, graph.settings), 'eq:1');
+  const wiki = note.refs.find(ref => ref.syntax === 'wiki')!, latex = note.refs.find(ref => ref.syntax === 'latex')!;
+  assert.equal(Engine.refText(wiki.target, graph.settings, wiki.block), 'eq:2');
+  assert.equal(Engine.refText(latex.target, graph.settings, latex.block), 'eq:2');
+  assert.equal(Engine.taggedTex(note.equations[1], label => graph.resolveLabel(label, note.path)), '\\text{(2)}');
+});
+
+test('commented row separators and environment delimiters are ignored', () => {
+  const note = Engine.parse('comment-rows.md', ['$$', '\\begin{align*}', 'x &= 1 \\label{a} % ignored \\\\', '\\label{b} \\\\', 'y &= 2', '\\end{align*}', '$$', '', '$$\\eqref{a}\\ \\eqref{b}$$'].join('\n'));
+  const graph = Engine.graph([note]), eq = note.equations[0];
+  assert.deepEqual(eq.rowGroups, [['a', 'b']]);
+  assert.deepEqual(eq.rowNumbers, { a: '1', b: '1' });
+  const tex = Engine.taggedTex(eq, label => graph.resolveLabel(label, note.path));
+  assert.equal((tex.match(/\\tag/g) || []).length, 1);
+  assert.ok(tex.includes('% ignored'));
+  assert.equal(Engine.taggedTex(note.equations[1], label => graph.resolveLabel(label, note.path)), '\\text{(1)}\\ \\text{(1)}');
+  const env = Engine.parse('comment-env.md', ['$$', '\\begin{align*}', 'a &= b \\label{one} \\\\', '% \\begin{aligned}', 'c &= d \\label{two}', '\\end{align*}', '$$'].join('\n'));
+  assert.deepEqual(env.equations[0].rowGroups, [['one'], ['two']]);
+});
+
+test('commented tags and notag do not affect numbering', () => {
+  const note = Engine.parse('comment-tag.md', '$$x=1 % \\tag{A} \\notag\n$$');
+  Engine.graph([note], { equationMode: 'all' });
+  assert.equal(note.equations[0].manual, null);
+  assert.equal(note.equations[0].number, '1');
+});
+
+test('a row break before a comment is not mistaken for an escaped percent', () => {
+  const note = Engine.parse('comment-percent.md', ['$$', '\\begin{align*}', 'a &= b \\\\% \\label{ignored}', 'c &= d \\label{kept}', '\\end{align*}', '$$', '', '$$\\eqref{kept}$$'].join('\n'));
+  const graph = Engine.graph([note]), eq = note.equations[0];
+  assert.deepEqual(eq.rowGroups, [['kept']]);
+  assert.equal(note.blocks.has('ignored'), false);
+  assert.equal(note.blocks.get('kept'), eq);
+  assert.match(Engine.taggedTex(eq, label => graph.resolveLabel(label, note.path)), /c &= d \\tag\{1\}/);
+});
+
+test('a label colliding with a native block ID on another target is ambiguous', () => {
+  const note = Engine.parse('collide.md', ['$$', 'x = 1 \\label{valid}', '$$', '', 'Ordinary text ^valid', '', '[[#^valid]]'].join('\n'));
+  const graph = Engine.graph([note]);
+  assert.equal(note.blocks.get('valid'), null);
+  assert.equal(graph.resolve('#^valid', 'collide.md'), null);
+  assert.equal(note.refs[0].target, null);
+  assert.ok(graph.warnings.some(w => w.includes('valid')));
+});
+
+test('same-target label aliases and cross-file duplicate labels stay valid', () => {
+  const alias = Engine.parse('alias-same.md', '$$x=1 \\label{foo}$$ ^foo');
+  const a = Engine.parse('a.md', '$$x=1 \\label{shared}$$');
+  const b = Engine.parse('b.md', '$$y=2 \\label{shared}$$');
+  Engine.graph([alias, a, b]);
+  assert.equal(alias.blocks.get('foo'), alias.equations[0]);
+  assert.deepEqual(alias.warnings, []);
+  assert.equal(a.blocks.get('shared'), a.equations[0]);
+  assert.equal(b.blocks.get('shared'), b.equations[0]);
+  assert.deepEqual([...a.warnings, ...b.warnings], []);
+});
+
+test('a row tag resolves for labels on that row', () => {
+  const same = Engine.parse('same-row-tag.md', ['$$', '\\begin{align*}', 'a &= b \\label{one} \\tag{A} \\\\', 'c &= d', '\\end{align*}', '$$', '', '$$\\eqref{one}$$'].join('\n'));
+  const sameGraph = Engine.graph([same]);
+  assert.equal(Engine.refText(same.equations[0], sameGraph.settings, 'one'), 'eq:A');
+  assert.equal(Engine.taggedTex(same.equations[1], label => sameGraph.resolveLabel(label, same.path)), '\\text{(A)}');
+});
+
+test('reference suggestions keep a typed row label instead of the first label', () => {
+  const rows = Engine.parse('math.md', ['$$', '\\begin{align*}', 'a &= b \\label{first} \\\\', 'c &= d \\label{second}', '\\end{align*}', '$$'].join('\n'));
+  const plugin: any = new AcademicNotes();
+  plugin.settings = { ...Engine.DEFAULTS };
+  plugin.graph = Engine.graph([rows]);
+  plugin.scheduleIndex = () => {};
+  const suggest: any = new ReferenceSuggest(plugin); suggest.close = () => {};
+  let text = '$$\\eqref{second}$$';
+  const offset = (pos: { line: number; ch: number }) => text.split('\n').slice(0, pos.line).reduce((n, line) => n + line.length + 1, 0) + pos.ch;
+  const editor: any = { getLine: (line: number) => text.split('\n')[line], getRange: (from: any, to: any) => text.slice(offset(from), offset(to)),
+    replaceRange: (value: string, from: any, to: any) => { text = text.slice(0, offset(from)) + value + text.slice(offset(to)); } };
+  const ctx = suggest.onTrigger({ line: 0, ch: '$$\\eqref{second'.length }, editor, { path: 'math.md' } as any)!;
+  assert.equal(ctx.query, 'second');
+  suggest.context = { ...ctx, editor, file: { path: 'math.md' } };
+  suggest.selectSuggestion(rows.equations[0]);
+  assert.equal(text, '$$\\eqref{second}$$');
 });
 
 test('row labels and clickable references resolve across files', () => {

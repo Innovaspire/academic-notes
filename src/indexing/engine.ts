@@ -36,6 +36,8 @@ export interface SourceRecord {
     environment?: CustomEnvironment;
     /** Labels grouped by the multi-line row they belong to; each group gets one number. */
     rowGroups?: string[][];
+    /** Row labels whose row carries an explicit \tag, mapped to that tag. */
+    rowTags?: Record<string, string>;
     /** Every label in a numbered row, mapped to that row's number. */
     rowNumbers?: Record<string, string>;
 }
@@ -185,10 +187,11 @@ function parse(path: string, source: string, cache: {
         const tex = source.slice(from + 2, close).split('\n').map((l, i) => { if (!i || !depth)
             return l; for (let d = 0; d < depth; d++)
             l = l.replace(/^[ \t]*>[ \t]?/, ''); return l; }).join('\n').trim();
-        const tags = [...tex.replace(/(?<!\\)%[^\n]*/g, '').matchAll(/\\tag(\*)?\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g)];
+        const maskedTex = maskComments(tex);
+        const tags = [...maskedTex.matchAll(/\\tag(\*)?\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g)];
         const rec: SourceRecord = { kind: 'equation', key: 'equation', path, line, endLine, from, to, depth: quote(lines[line]).depth,
             tex, id: null, manual: tags.length === 1 ? tags[0][2] : null, multiTag: tags.length > 1,
-            suppress: /\\(?:notag|nonumber)\b/.test(tex) && tags.length === 0, number: '', ids: [] };
+            suppress: /\\(?:notag|nonumber)\b/.test(maskedTex) && tags.length === 0, number: '', ids: [] };
         if (rec.multiTag)
             warnings.push(t("{0}:{1} 含多个手写 tag，保留公式但不猜测整块引用编号。", path, line + 1));
         // \label and \eqref are ordinary LaTeX commands; their names are block IDs.
@@ -199,8 +202,11 @@ function parse(path: string, source: string, cache: {
         const env = rowEnvironment(tex);
         if (env && ROW_ENVIRONMENTS.has(env.name)) {
             const rows = rowGroups(env.body, latex.labels, env.bodyStart);
-            if (rows.multi && rows.groups.length)
+            if (rows.multi && rows.groups.length) {
                 rec.rowGroups = rows.groups;
+                if (Object.keys(rows.tags).length)
+                    rec.rowTags = rows.tags;
+            }
         }
         const content = source.slice(from + 2, close), lead = content.length - content.trimStart().length;
         const leadLines = (content.slice(0, lead).match(/\n/g) || []).length;
@@ -275,6 +281,9 @@ function parse(path: string, source: string, cache: {
         rec.id = id; }
     const ids = [...prose.matchAll(/(?:^|[ \t])\^([A-Za-z0-9-]+)[ \t]*\r?$/gm)];
     const anchors = new Map<string, number[]>();
+    // Native IDs include ones on ordinary paragraphs, which are not records but can
+    // still collide with a \label name.
+    const nativeOwners = new Map<string, SourceRecord | null>();
     for (const m of ids) {
         const ln = lineOf(starts, m.index + m[0].indexOf('^')), q = quote(lines[ln]);
         const locations = anchors.get(m[1]) || []; locations.push(ln); anchors.set(m[1], locations);
@@ -297,10 +306,14 @@ function parse(path: string, source: string, cache: {
         if (eq)
             rec = eq;
         bind(rec, m[1]);
+        nativeOwners.set(m[1], rec ?? null);
     }
     for (const block of algorithms) {
         const rec = records.find(r => r.kind === 'algorithm' && r.from === block.from);
-        for (const id of block.ids) bind(rec, id);
+        for (const id of block.ids) {
+            bind(rec, id);
+            nativeOwners.set(id, rec ?? null);
+        }
         for (let line = block.line; line <= block.endLine; line++) {
             const id = quote(lines[line]).body.trim().match(/^\^([A-Za-z0-9-]+)$/)?.[1];
             if (id && block.ids.includes(id)) { const locations = anchors.get(id) || []; if (!locations.includes(line)) locations.push(line); anchors.set(id, locations); }
@@ -308,8 +321,16 @@ function parse(path: string, source: string, cache: {
     }
     // Explicit ^id markers stay canonical; \label names are additional aliases.
     for (const { rec, names } of labelBindings)
-        for (const name of names)
+        for (const name of names) {
+            // A native ID on another target (or on an ordinary paragraph, which has
+            // no record) must be reported instead of silently shadowed by \label.
+            if (nativeOwners.has(name) && (nativeOwners.get(name) !== rec || (anchors.get(name)?.length ?? 0) > 1)) {
+                blocks.set(name, null);
+                warnings.push(t("{0}: 块 ID ^{1} 与同名 \\label 指向不同目标，不解析歧义引用。", path, name));
+                continue;
+            }
             bind(rec, name);
+        }
     // Cache supplements missing bindings; it must not overwrite an explicit nested subfigure ID.
     for (const [id, b] of Object.entries(cache.blocks || {})) {
         const p = b.position;
@@ -356,7 +377,7 @@ function splitTarget(raw: string) {
     raw = decode(raw);
     // LaTeX labels may contain ':' and '.', so plugin-resolved block IDs are wider
     // than Obsidian's native [A-Za-z0-9-] block IDs.
-    const block = (value: string) => !!value && !/[\s#|\[\]]/.test(value);
+    const block = (value: string) => !!value && !/[\s#|[\]]/.test(value);
     let at = raw.indexOf('#^');
     if (at >= 0 && block(raw.slice(at + 2)))
         return { file: raw.slice(0, at), block: raw.slice(at + 2) };
@@ -377,9 +398,27 @@ function labelTarget(raw: string) {
     const block = value.replace(/^\^/, '').trim();
     return block ? { file: '', block } : null;
 }
+/** Blanks TeX comments while preserving offsets and line breaks. */
+function maskComments(tex: string) {
+    const chars = tex.split('');
+    for (let i = 0; i < chars.length; i++) {
+        if (chars[i] !== '%')
+            continue;
+        // An even number of preceding backslashes means the percent is unescaped;
+        // "\\%" is a row break followed by a comment, not an escaped percent.
+        let slashes = 0;
+        for (let j = i - 1; j >= 0 && chars[j] === '\\'; j--)
+            slashes++;
+        if (slashes % 2)
+            continue;
+        while (i < chars.length && chars[i] !== '\n')
+            chars[i++] = ' ';
+    }
+    return chars.join('');
+}
 function latexCommands(tex: string) {
     // Mask comments while preserving offsets so edits do not shift source lines.
-    const masked = tex.replace(/(?<!\\)%[^\n]*/g, comment => ' '.repeat(comment.length)), labels: { name: string; index: number }[] = [], refs: { command: 'eqref' | 'ref'; label: string; index: number; source: string }[] = [];
+    const masked = maskComments(tex), labels: { name: string; index: number }[] = [], refs: { command: 'eqref' | 'ref'; label: string; index: number; source: string }[] = [];
     for (const m of masked.matchAll(/\\label\s*\{([^{}]*)\}/g)) {
         const name = (m[1] || '').trim().replace(/^\^/, '');
         if (name)
@@ -396,7 +435,8 @@ function latexCommands(tex: string) {
 const ROW_ENVIRONMENTS = new Set(['align', 'align*', 'gather', 'gather*', 'multline', 'multline*', 'eqnarray', 'eqnarray*', 'aligned', 'gathered', 'split']);
 const ROW_ENV_TARGET: Record<string, string> = { aligned: 'align', gathered: 'gather', split: 'align', align: 'align', gather: 'gather', equation: 'equation', multline: 'multline', eqnarray: 'eqnarray' };
 function rowEnvironment(tex: string) {
-    const begin = tex.match(/^\s*\\begin\{([A-Za-z]+\*?)\}/), end = tex.match(/\\end\{([A-Za-z]+\*?)\}\s*$/);
+    const masked = maskComments(tex);
+    const begin = masked.match(/^\s*\\begin\{([A-Za-z]+\*?)\}/), end = masked.match(/\\end\{([A-Za-z]+\*?)\}\s*$/);
     if (!begin || !end || begin[1] !== end[1])
         return null;
     const bodyStart = begin[0].length;
@@ -404,7 +444,9 @@ function rowEnvironment(tex: string) {
 }
 /** Group top-level labels by the top-level row they sit on. */
 function rowGroups(body: string, labels: { name: string; index: number }[], bodyStart: number) {
-    const groups: string[][] = [], sorted = labels.filter(label => label.index >= bodyStart && label.index <= bodyStart + body.length)
+    // A commented \\ is not a row separator; scan a masked copy but keep offsets.
+    const masked = maskComments(body);
+    const groups: string[][] = [], rowTags: Record<number, string> = {}, sorted = labels.filter(label => label.index >= bodyStart && label.index <= bodyStart + body.length)
         .map(label => ({ name: label.name, index: label.index - bodyStart })).sort((a, b) => a.index - b.index);
     let depth = 0, row = 0, i = 0, li = 0, multi = false;
     const push = () => {
@@ -412,17 +454,28 @@ function rowGroups(body: string, labels: { name: string; index: number }[], body
         if (!depth && label)
             (groups[row] ||= []).push(label.name);
     };
-    while (i < body.length) {
+    while (i < masked.length) {
         while (li < sorted.length && sorted[li].index === i)
             push();
-        if (body.startsWith('\\begin{', i)) { depth++; i += 7; continue; }
-        if (body.startsWith('\\end{', i)) { depth = Math.max(0, depth - 1); i += 5; continue; }
-        if (!depth && body.startsWith('\\\\', i)) { multi = true; row++; i += 2; continue; }
+        if (masked.startsWith('\\begin{', i)) { depth++; i += 7; continue; }
+        if (masked.startsWith('\\end{', i)) { depth = Math.max(0, depth - 1); i += 5; continue; }
+        if (!depth) {
+            if (masked.startsWith('\\tag', i)) {
+                const tag = masked.slice(i).match(/^\\tag\*?\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/);
+                if (tag) { rowTags[row] = tag[1]; i += tag[0].length; continue; }
+            }
+            if (masked.startsWith('\\\\', i)) { multi = true; row++; i += 2; continue; }
+        }
         i++;
     }
     while (li < sorted.length)
         push();
-    return { groups: groups.filter(Boolean), multi };
+    const tags: Record<string, string> = {};
+    for (let r = 0; r < groups.length; r++)
+        if (rowTags[r])
+            for (const name of groups[r] || [])
+                tags[name] = rowTags[r];
+    return { groups: groups.filter(Boolean), multi, tags };
 }
 /** MathJax rejects \tag inside aligned/gathered/split; use the display equivalent. */
 function starRowEnvironment(tex: string) {
@@ -598,17 +651,20 @@ function referenceFormat(key: string, opts: Partial<typeof DEFAULTS> = {}, kind 
     }
     return format;
 }
-function refText(r: SourceRecord | null | undefined, settings = DEFAULTS) {
+function refText(r: SourceRecord | null | undefined, settings = DEFAULTS, label?: string) {
     if (!r)
         return null;
     settings = { ...DEFAULTS, ...settings };
     const override = referenceOverrides(settings)[r.key] || {};
     const name = override.name || typeNames(r.key, settings)[0];
     const abbr = override.abbr || r.environment?.abbr || ABBR[r.key] || r.key, type = settings.shortReferences ? abbr : name;
-    if (!r.number)
+    // A row label must use its own tag/number, never the first row's fallback.
+    const rowLabel = !!label && !!r.rowGroups?.some(group => group.includes(label));
+    const number = rowLabel ? r.rowTags?.[label] ?? r.rowNumbers?.[label] ?? '' : r.number;
+    if (!number)
         return `${type}${r.title ? ' · ' + plain(r.title) : t("（未编号）")}`;
     const format = referenceFormat(r.key, settings, r.kind);
-    return String(format).replace(/\{(number|type|name|abbr|title|file)\}/g, (_, k: 'number' | 'type' | 'name' | 'abbr' | 'title' | 'file') => ({ number: r.number, type, name, abbr, title: plain(r.title), file: r.path.replace(/\.md$/i, '').split('/').pop() || '' })[k]);
+    return String(format).replace(/\{(number|type|name|abbr|title|file)\}/g, (_, k: 'number' | 'type' | 'name' | 'abbr' | 'title' | 'file') => ({ number, type, name, abbr, title: plain(r.title), file: r.path.replace(/\.md$/i, '').split('/').pop() || '' })[k]);
 }
 function taggedTex(eq: SourceRecord, resolve?: (label: string) => SourceRecord | null, links = false) {
     let tex = eq.tex || '';
@@ -638,7 +694,10 @@ function taggedTex(eq: SourceRecord, resolve?: (label: string) => SourceRecord |
     if (resolve)
         tex = tex.replace(/(?<![A-Za-z\\])\\(eq)?ref\s*\{([^{}]*)\}/g, (whole, kind: string | undefined, label: string) => {
             const key = label.trim(), target = resolve(key), name = labelTarget(key)?.block || key.replace(/^\^/, '');
-            const raw = target?.rowNumbers?.[name] ?? target?.number;
+            // Row labels keep their own tag/number; a missing row value must not
+            // fall back to the first row or the block's manual tag.
+            const rowLabel = !!target?.rowGroups?.some(group => group.includes(name));
+            const raw = rowLabel ? target!.rowTags?.[name] ?? target!.rowNumbers?.[name] ?? '' : target?.number;
             if (!raw)
                 return whole;
             const number = raw.replace(/[\\{}%#&$]/g, ch => '\\' + ch), shown = '\\text{' + (kind ? '(' + number + ')' : number) + '}';

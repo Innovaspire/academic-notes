@@ -58538,6 +58538,7 @@ var ENGLISH = {
   "{0}:{1} \u542B\u591A\u4E2A\u624B\u5199 tag\uFF0C\u4FDD\u7559\u516C\u5F0F\u4F46\u4E0D\u731C\u6D4B\u6574\u5757\u5F15\u7528\u7F16\u53F7\u3002": "{0}:{1} Multiple explicit tags: preserve the equation without inferring a single reference number.",
   "{0}: \u5B58\u5728\u672A\u95ED\u5408\u7684 $$\uFF0C\u6700\u540E\u4E00\u6BB5\u4E0D\u53C2\u4E0E\u7F16\u53F7\u3002": "{0}: Unclosed $$; the final block is not numbered.",
   "{0}: \u91CD\u590D\u5757 ID ^{1}\uFF0C\u4E0D\u89E3\u6790\u6B67\u4E49\u5F15\u7528\u3002": "{0}: Duplicate block ID ^{1}; ambiguous references are not resolved.",
+  "{0}: \u5757 ID ^{1} \u4E0E\u540C\u540D \\label \u6307\u5411\u4E0D\u540C\u76EE\u6807\uFF0C\u4E0D\u89E3\u6790\u6B67\u4E49\u5F15\u7528\u3002": "{0}: Block ID ^{1} and a \\label with the same name refer to different targets; ambiguous references are not resolved.",
   "{0}:{1} subfigure \u4E0D\u5728 figure \u5185\uFF0C\u4EC5\u663E\u793A\u9898\u6CE8\uFF0C\u4E0D\u731C\u6D4B\u4E3B\u56FE\u7F16\u53F7\u3002": "{0}:{1} Subfigure outside a figure: show its caption without inferring a parent figure number.",
   "\uFF08\u672A\u7F16\u53F7\uFF09": " (unnumbered)",
   "\u5F53\u524D Obsidian \u672A\u63D0\u4F9B Electron PDF \u63A5\u53E3\uFF0C\u8BF7\u66F4\u65B0\u684C\u9762\u5B89\u88C5\u7A0B\u5E8F\u3002": "Obsidian's Electron PDF interface is unavailable. Update the desktop installer.",
@@ -58876,7 +58877,8 @@ function parse(path, source, cache = {}, opts = {}) {
         l = l.replace(/^[ \t]*>[ \t]?/, "");
       return l;
     }).join("\n").trim();
-    const tags = [...tex.replace(/(?<!\\)%[^\n]*/g, "").matchAll(/\\tag(\*)?\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g)];
+    const maskedTex = maskComments(tex);
+    const tags = [...maskedTex.matchAll(/\\tag(\*)?\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g)];
     const rec = {
       kind: "equation",
       key: "equation",
@@ -58890,7 +58892,7 @@ function parse(path, source, cache = {}, opts = {}) {
       id: null,
       manual: tags.length === 1 ? tags[0][2] : null,
       multiTag: tags.length > 1,
-      suppress: /\\(?:notag|nonumber)\b/.test(tex) && tags.length === 0,
+      suppress: /\\(?:notag|nonumber)\b/.test(maskedTex) && tags.length === 0,
       number: "",
       ids: []
     };
@@ -58902,8 +58904,11 @@ function parse(path, source, cache = {}, opts = {}) {
     const env = rowEnvironment(tex);
     if (env && ROW_ENVIRONMENTS.has(env.name)) {
       const rows = rowGroups(env.body, latex.labels, env.bodyStart);
-      if (rows.multi && rows.groups.length)
+      if (rows.multi && rows.groups.length) {
         rec.rowGroups = rows.groups;
+        if (Object.keys(rows.tags).length)
+          rec.rowTags = rows.tags;
+      }
     }
     const content = source.slice(from + 2, close), lead = content.length - content.trimStart().length;
     const leadLines = (content.slice(0, lead).match(/\n/g) || []).length;
@@ -59011,6 +59016,7 @@ function parse(path, source, cache = {}, opts = {}) {
   }
   const ids = [...prose.matchAll(/(?:^|[ \t])\^([A-Za-z0-9-]+)[ \t]*\r?$/gm)];
   const anchors = /* @__PURE__ */ new Map();
+  const nativeOwners = /* @__PURE__ */ new Map();
   for (const m of ids) {
     const ln = lineOf(starts, m.index + m[0].indexOf("^")), q = quote2(lines[ln]);
     const locations = anchors.get(m[1]) || [];
@@ -59031,10 +59037,14 @@ function parse(path, source, cache = {}, opts = {}) {
     if (eq)
       rec = eq;
     bind(rec, m[1]);
+    nativeOwners.set(m[1], rec ?? null);
   }
   for (const block of algorithms) {
     const rec = records.find((r) => r.kind === "algorithm" && r.from === block.from);
-    for (const id2 of block.ids) bind(rec, id2);
+    for (const id2 of block.ids) {
+      bind(rec, id2);
+      nativeOwners.set(id2, rec ?? null);
+    }
     for (let line = block.line; line <= block.endLine; line++) {
       const id2 = quote2(lines[line]).body.trim().match(/^\^([A-Za-z0-9-]+)$/)?.[1];
       if (id2 && block.ids.includes(id2)) {
@@ -59045,8 +59055,14 @@ function parse(path, source, cache = {}, opts = {}) {
     }
   }
   for (const { rec, names } of labelBindings)
-    for (const name of names)
+    for (const name of names) {
+      if (nativeOwners.has(name) && (nativeOwners.get(name) !== rec || (anchors.get(name)?.length ?? 0) > 1)) {
+        blocks.set(name, null);
+        warnings.push(t("{0}: \u5757 ID ^{1} \u4E0E\u540C\u540D \\label \u6307\u5411\u4E0D\u540C\u76EE\u6807\uFF0C\u4E0D\u89E3\u6790\u6B67\u4E49\u5F15\u7528\u3002", path, name));
+        continue;
+      }
       bind(rec, name);
+    }
   for (const [id2, b] of Object.entries(cache.blocks || {})) {
     const p = b.position;
     if (!p || blocks.has(id2))
@@ -59090,7 +59106,7 @@ function parse(path, source, cache = {}, opts = {}) {
 }
 function splitTarget(raw) {
   raw = decode(raw);
-  const block = (value) => !!value && !/[\s#|\[\]]/.test(value);
+  const block = (value) => !!value && !/[\s#|[\]]/.test(value);
   let at = raw.indexOf("#^");
   if (at >= 0 && block(raw.slice(at + 2)))
     return { file: raw.slice(0, at), block: raw.slice(at + 2) };
@@ -59110,8 +59126,23 @@ function labelTarget(raw) {
   const block = value.replace(/^\^/, "").trim();
   return block ? { file: "", block } : null;
 }
+function maskComments(tex) {
+  const chars = tex.split("");
+  for (let i = 0; i < chars.length; i++) {
+    if (chars[i] !== "%")
+      continue;
+    let slashes = 0;
+    for (let j = i - 1; j >= 0 && chars[j] === "\\"; j--)
+      slashes++;
+    if (slashes % 2)
+      continue;
+    while (i < chars.length && chars[i] !== "\n")
+      chars[i++] = " ";
+  }
+  return chars.join("");
+}
 function latexCommands(tex) {
-  const masked = tex.replace(/(?<!\\)%[^\n]*/g, (comment) => " ".repeat(comment.length)), labels = [], refs = [];
+  const masked = maskComments(tex), labels = [], refs = [];
   for (const m of masked.matchAll(/\\label\s*\{([^{}]*)\}/g)) {
     const name = (m[1] || "").trim().replace(/^\^/, "");
     if (name)
@@ -59127,44 +59158,61 @@ function latexCommands(tex) {
 var ROW_ENVIRONMENTS = /* @__PURE__ */ new Set(["align", "align*", "gather", "gather*", "multline", "multline*", "eqnarray", "eqnarray*", "aligned", "gathered", "split"]);
 var ROW_ENV_TARGET = { aligned: "align", gathered: "gather", split: "align", align: "align", gather: "gather", equation: "equation", multline: "multline", eqnarray: "eqnarray" };
 function rowEnvironment(tex) {
-  const begin = tex.match(/^\s*\\begin\{([A-Za-z]+\*?)\}/), end = tex.match(/\\end\{([A-Za-z]+\*?)\}\s*$/);
+  const masked = maskComments(tex);
+  const begin = masked.match(/^\s*\\begin\{([A-Za-z]+\*?)\}/), end = masked.match(/\\end\{([A-Za-z]+\*?)\}\s*$/);
   if (!begin || !end || begin[1] !== end[1])
     return null;
   const bodyStart = begin[0].length;
   return { name: begin[1], bodyStart, body: tex.slice(bodyStart, tex.length - end[0].length) };
 }
 function rowGroups(body, labels, bodyStart) {
-  const groups = [], sorted = labels.filter((label3) => label3.index >= bodyStart && label3.index <= bodyStart + body.length).map((label3) => ({ name: label3.name, index: label3.index - bodyStart })).sort((a, b) => a.index - b.index);
+  const masked = maskComments(body);
+  const groups = [], rowTags = {}, sorted = labels.filter((label3) => label3.index >= bodyStart && label3.index <= bodyStart + body.length).map((label3) => ({ name: label3.name, index: label3.index - bodyStart })).sort((a, b) => a.index - b.index);
   let depth = 0, row = 0, i = 0, li = 0, multi = false;
   const push = () => {
     const label3 = sorted[li++];
     if (!depth && label3)
       (groups[row] ||= []).push(label3.name);
   };
-  while (i < body.length) {
+  while (i < masked.length) {
     while (li < sorted.length && sorted[li].index === i)
       push();
-    if (body.startsWith("\\begin{", i)) {
+    if (masked.startsWith("\\begin{", i)) {
       depth++;
       i += 7;
       continue;
     }
-    if (body.startsWith("\\end{", i)) {
+    if (masked.startsWith("\\end{", i)) {
       depth = Math.max(0, depth - 1);
       i += 5;
       continue;
     }
-    if (!depth && body.startsWith("\\\\", i)) {
-      multi = true;
-      row++;
-      i += 2;
-      continue;
+    if (!depth) {
+      if (masked.startsWith("\\tag", i)) {
+        const tag = masked.slice(i).match(/^\\tag\*?\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/);
+        if (tag) {
+          rowTags[row] = tag[1];
+          i += tag[0].length;
+          continue;
+        }
+      }
+      if (masked.startsWith("\\\\", i)) {
+        multi = true;
+        row++;
+        i += 2;
+        continue;
+      }
     }
     i++;
   }
   while (li < sorted.length)
     push();
-  return { groups: groups.filter(Boolean), multi };
+  const tags = {};
+  for (let r = 0; r < groups.length; r++)
+    if (rowTags[r])
+      for (const name of groups[r] || [])
+        tags[name] = rowTags[r];
+  return { groups: groups.filter(Boolean), multi, tags };
 }
 function starRowEnvironment(tex) {
   const begin = tex.match(/^(\s*)\\begin\{([A-Za-z]+)(\*?)\}(?:\[[^\]]*\])?/), end = tex.match(/\\end\{([A-Za-z]+)(\*?)\}(\s*)$/);
@@ -59353,17 +59401,19 @@ function referenceFormat(key2, opts = {}, kind = key2) {
   }
   return format;
 }
-function refText(r, settings = DEFAULTS) {
+function refText(r, settings = DEFAULTS, label3) {
   if (!r)
     return null;
   settings = { ...DEFAULTS, ...settings };
   const override = referenceOverrides(settings)[r.key] || {};
   const name = override.name || typeNames(r.key, settings)[0];
   const abbr = override.abbr || r.environment?.abbr || ABBR[r.key] || r.key, type = settings.shortReferences ? abbr : name;
-  if (!r.number)
+  const rowLabel = !!label3 && !!r.rowGroups?.some((group) => group.includes(label3));
+  const number = rowLabel ? r.rowTags?.[label3] ?? r.rowNumbers?.[label3] ?? "" : r.number;
+  if (!number)
     return `${type}${r.title ? " \xB7 " + plain(r.title) : t("\uFF08\u672A\u7F16\u53F7\uFF09")}`;
   const format = referenceFormat(r.key, settings, r.kind);
-  return String(format).replace(/\{(number|type|name|abbr|title|file)\}/g, (_, k) => ({ number: r.number, type, name, abbr, title: plain(r.title), file: r.path.replace(/\.md$/i, "").split("/").pop() || "" })[k]);
+  return String(format).replace(/\{(number|type|name|abbr|title|file)\}/g, (_, k) => ({ number, type, name, abbr, title: plain(r.title), file: r.path.replace(/\.md$/i, "").split("/").pop() || "" })[k]);
 }
 function taggedTex(eq, resolve, links = false) {
   let tex = eq.tex || "";
@@ -59389,7 +59439,8 @@ function taggedTex(eq, resolve, links = false) {
   if (resolve)
     tex = tex.replace(/(?<![A-Za-z\\])\\(eq)?ref\s*\{([^{}]*)\}/g, (whole, kind, label3) => {
       const key2 = label3.trim(), target = resolve(key2), name = labelTarget(key2)?.block || key2.replace(/^\^/, "");
-      const raw = target?.rowNumbers?.[name] ?? target?.number;
+      const rowLabel = !!target?.rowGroups?.some((group) => group.includes(name));
+      const raw = rowLabel ? target.rowTags?.[name] ?? target.rowNumbers?.[name] ?? "" : target?.number;
       if (!raw)
         return whole;
       const number = raw.replace(/[\\{}%#&$]/g, (ch) => "\\" + ch), shown = "\\text{" + (kind ? "(" + number + ")" : number) + "}";
@@ -61234,7 +61285,7 @@ function renderFragment(el, note, graph2, infoFor) {
       continue;
     if (graph2.settings.respectAliases && ref.alias !== null)
       continue;
-    const text = engine_default.refText(r, graph2.settings);
+    const text = engine_default.refText(r, graph2.settings, ref.block);
     if (a.textContent !== text)
       a.textContent = text;
     setClass(a, "an-ref");
@@ -61335,7 +61386,7 @@ function createLiveExtension(plugin) {
           continue;
         if (!view.visibleRanges.some((v) => ref.to >= v.from && ref.from <= v.to))
           continue;
-        const text = engine_default.refText(ref.target, plugin.settings);
+        const text = engine_default.refText(ref.target, plugin.settings, ref.block);
         ranges.push(import_view.Decoration.replace({ widget: new LinkWidget(text || "", ref.raw, note.path, ref.from) }).range(ref.from, ref.to));
       }
       return import_view.Decoration.set(ranges, true);
@@ -61843,7 +61894,7 @@ var ReferencePicker = class extends import_obsidian3.FuzzySuggestModal {
     return this.plugin.targets();
   }
   getItemText(r) {
-    return `${engine_default.refText(r, this.plugin.settings)} ${r.title || r.tex || ""} \u2014 ${r.path} ^${r.id}`;
+    return `${engine_default.refText(r, this.plugin.settings, r.kind === "equation" ? r.id ?? void 0 : void 0)} ${r.title || r.tex || ""} \u2014 ${r.path} ^${r.id}`;
   }
   onChooseItem(r) {
     if (!this.file)
@@ -61872,12 +61923,17 @@ var ReferenceSuggest = class extends import_obsidian3.EditorSuggest {
     const closing2 = m[0].includes("{") && editor.getLine(cursor.line).charAt(cursor.ch) === "}";
     return { start: { line: cursor.line, ch: cursor.ch - m[0].length }, end: closing2 ? { line: cursor.line, ch: cursor.ch + 1 } : cursor, query: (m[2] || "").trim() };
   }
+  /** Keep the row label the user typed instead of collapsing to the first label. */
+  labelFor(r, query = this.context?.query || "") {
+    const name = engine_default.labelTarget(query)?.block;
+    return name && r.kind === "equation" && r.ids.includes(name) ? name : void 0;
+  }
   getSuggestions(ctx) {
     const q = ctx.query.toLowerCase();
-    return this.plugin.targets().filter((r) => (this.kind !== "eqref" || r.kind === "equation") && (this.kind !== "tref" || r.kind === "theorem")).filter((r) => (engine_default.refText(r, this.plugin.settings) + " " + r.path + " " + (r.title || r.tex)).toLowerCase().includes(q)).slice(0, 30);
+    return this.plugin.targets().filter((r) => (this.kind !== "eqref" || r.kind === "equation") && (this.kind !== "tref" || r.kind === "theorem")).filter((r) => (engine_default.refText(r, this.plugin.settings, this.labelFor(r, ctx.query)) + " " + r.path + " " + (r.title || r.tex)).toLowerCase().includes(q)).slice(0, 30);
   }
   renderSuggestion(r, el) {
-    el.createDiv({ text: engine_default.refText(r, this.plugin.settings) || "", cls: "an-suggest-title" });
+    el.createDiv({ text: engine_default.refText(r, this.plugin.settings, this.labelFor(r)) || "", cls: "an-suggest-title" });
     el.createDiv({ text: (r.title || r.tex || "").slice(0, 130) + " \u2014 " + r.path, cls: "an-suggest-detail" });
   }
   selectSuggestion(r) {
@@ -61885,7 +61941,7 @@ var ReferenceSuggest = class extends import_obsidian3.EditorSuggest {
     if (!c?.file)
       return;
     const latex = this.math && (this.kind === "eqref" || this.kind === "ref" || this.kind === "tref");
-    c.editor.replaceRange(latex ? this.plugin.makeLatexReference(r, c.file.path, this.kind === "eqref" ? "eqref" : "ref") : this.plugin.makeReference(r, c.file.path), c.start, c.end);
+    c.editor.replaceRange(latex ? this.plugin.makeLatexReference(r, c.file.path, this.kind === "eqref" ? "eqref" : "ref", this.labelFor(r)) : this.plugin.makeReference(r, c.file.path), c.start, c.end);
     this.close();
     this.plugin.scheduleIndex();
   }
@@ -64499,10 +64555,10 @@ var AcademicNotes = class extends import_obsidian10.Plugin {
       const affected = /* @__PURE__ */ new Set(), allViews = renderKey !== this.renderKey;
       for (const note of notes) {
         const labels = JSON.stringify([
-          note.records.map((r) => [r.key, r.id, r.number, r.referenced, r.rowNumbers]),
+          note.records.map((r) => [r.key, r.id, r.number, r.referenced, r.rowNumbers, r.rowTags]),
           note.refs.map((r) => {
-            const key2 = r.label ? engine_default.labelTarget(r.label)?.block : void 0;
-            return [r.targetPath, r.target && engine_default.refText(r.target, this.settings), r.target && key2 ? r.target.rowNumbers?.[key2] ?? r.target.number : null];
+            const key2 = r.block;
+            return [r.targetPath, r.target && engine_default.refText(r.target, this.settings, key2), r.target ? r.target.rowNumbers?.[key2] ?? null : null];
           })
         ]);
         const previous = this.renderStates.get(note.path);
@@ -64726,9 +64782,9 @@ var AcademicNotes = class extends import_obsidian10.Plugin {
     const target = record.path === sourcePath ? "" : record.path.replace(/\.md$/i, "");
     return "[[" + target + "#^" + record.id + "]]";
   }
-  makeLatexReference(record, sourcePath, command = "eqref") {
+  makeLatexReference(record, sourcePath, command = "eqref", label3) {
     const target = record.path === sourcePath ? "" : record.path.replace(/\.md$/i, "") + "#^";
-    return "\\" + command + "{" + target + record.id + "}";
+    return "\\" + command + "{" + target + (label3 || record.id) + "}";
   }
   targets() {
     return this.graph ? [...this.graph.notes.values()].flatMap((n) => n.records.filter((r) => r.id)) : [];
@@ -64850,7 +64906,7 @@ var AcademicNotes = class extends import_obsidian10.Plugin {
     }
     for (const r of note.refs)
       if (!r.embed && r.target && (!this.settings.respectAliases || r.alias === null) && r.syntax === "wiki") {
-        const label3 = engine_default.refText(r.target, graph2.settings).replace(/\|/g, "\\|").replace(/\]/g, "");
+        const label3 = engine_default.refText(r.target, graph2.settings, r.block).replace(/\|/g, "\\|").replace(/\]/g, "");
         replacements.push({ from: r.from, to: r.to, text: "[[" + r.raw + "|" + label3 + "]]" });
       }
     let text = note.source;
@@ -64896,7 +64952,7 @@ var AcademicNotes = class extends import_obsidian10.Plugin {
         for (const rec of note.records) {
           const old = original.records.find((r) => r.from === rec.from && r.kind === rec.kind);
           if (old)
-            Object.assign(rec, { number: old.number, prefix: old.prefix, subletter: old.subletter, referenced: old.referenced, rowNumbers: old.rowNumbers });
+            Object.assign(rec, { number: old.number, prefix: old.prefix, subletter: old.subletter, referenced: old.referenced, rowNumbers: old.rowNumbers, rowTags: old.rowTags });
         }
       }
       warnings.push(t("\u4FDD\u7559\u7B14\u8BB0\u7F16\u53F7\u6A21\u5F0F\uFF1A\u4E0D\u540C\u7AE0\u8282\u53EF\u80FD\u663E\u793A\u76F8\u540C\u7F16\u53F7\uFF1B\u8DF3\u8F6C\u4ECD\u6309\u6587\u4EF6\u8DEF\u5F84\u548C\u5757 ID \u533A\u5206\u3002"));
@@ -65001,7 +65057,7 @@ var AcademicNotes = class extends import_obsidian10.Plugin {
       stage.querySelectorAll(".an-uniform-height").forEach(updateFigureImageRatio);
       if (stage.querySelector('[data-mml-node="merror"],mjx-merror'))
         throw new Error(t("\u68C0\u6D4B\u5230\u6570\u5B66\u6E32\u67D3\u9519\u8BEF\uFF0C\u5DF2\u505C\u6B62 PDF \u5BFC\u51FA\uFF1B\u8BF7\u5148\u68C0\u67E5\u539F\u516C\u5F0F\u3002"));
-      const opts = { ...options, preNumbered: true, toc: true }, meta = { ...opts, ...document_default.prepare(stage, opts), nativeSnapshot: true, numberingMode: options.book ? this.settings.exportNumbering : "note", targets: notes.flatMap((n) => n.records.filter((r) => r.id).map((r) => ({ path: r.path, block: r.id, kind: r.kind, number: r.number, reference: engine_default.refText(r, graph2.settings) }))) };
+      const opts = { ...options, preNumbered: true, toc: true }, meta = { ...opts, ...document_default.prepare(stage, opts), nativeSnapshot: true, numberingMode: options.book ? this.settings.exportNumbering : "note", targets: notes.flatMap((n) => n.records.filter((r) => r.id).map((r) => ({ path: r.path, block: r.id, kind: r.kind, number: r.number, reference: engine_default.refText(r, graph2.settings, r.id ?? void 0) }))) };
       meta.warnings.push(...warnings);
       const svg = doc.win.createSvg("svg"), defs = doc.win.createSvg("defs");
       svg.appendChild(defs);

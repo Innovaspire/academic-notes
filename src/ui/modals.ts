@@ -29,7 +29,7 @@ class ReferencePicker extends FuzzySuggestModal<SourceRecord> {
     file: TFile | null;
     constructor(plugin: AcademicNotes, editor: Editor, file: TFile | null) { super(plugin.app); this.plugin = plugin; this.editor = editor; this.file = file; this.setPlaceholder(t("搜索编号、定理标题、公式内容或文件名（目标需要块 ID）")); }
     getItems() { return this.plugin.targets(); }
-    getItemText(r: SourceRecord) { return `${Engine.refText(r, this.plugin.settings)} ${r.title || r.tex || ''} — ${r.path} ^${r.id}`; }
+    getItemText(r: SourceRecord) { return `${Engine.refText(r, this.plugin.settings, r.kind === 'equation' ? r.id ?? undefined : undefined)} ${r.title || r.tex || ''} — ${r.path} ^${r.id}`; }
     onChooseItem(r: SourceRecord) { if (!this.file)
         return; const latex = inDisplayMath(this.editor, this.editor.getCursor());
         this.editor.replaceSelection(latex ? this.plugin.makeLatexReference(r, this.file.path, r.kind === 'equation' ? 'eqref' : 'ref') : this.plugin.makeReference(r, this.file.path)); this.plugin.scheduleIndex(); }
@@ -52,11 +52,16 @@ class ReferenceSuggest extends EditorSuggest<SourceRecord> {
         const closing = m[0].includes('{') && editor.getLine(cursor.line).charAt(cursor.ch) === '}';
         return { start: { line: cursor.line, ch: cursor.ch - m[0].length }, end: closing ? { line: cursor.line, ch: cursor.ch + 1 } : cursor, query: (m[2] || '').trim() };
     }
-    getSuggestions(ctx: EditorSuggestContext) { const q = ctx.query.toLowerCase(); return this.plugin.targets().filter(r => (this.kind !== 'eqref' || r.kind === 'equation') && (this.kind !== 'tref' || r.kind === 'theorem')).filter(r => (Engine.refText(r, this.plugin.settings) + ' ' + r.path + ' ' + (r.title || r.tex)).toLowerCase().includes(q)).slice(0, 30); }
-    renderSuggestion(r: SourceRecord, el: HTMLElement) { el.createDiv({ text: Engine.refText(r, this.plugin.settings) || '', cls: 'an-suggest-title' }); el.createDiv({ text: (r.title || r.tex || '').slice(0, 130) + ' — ' + r.path, cls: 'an-suggest-detail' }); }
+    /** Keep the row label the user typed instead of collapsing to the first label. */
+    private labelFor(r: SourceRecord, query = this.context?.query || '') {
+        const name = Engine.labelTarget(query)?.block;
+        return name && r.kind === 'equation' && r.ids.includes(name) ? name : undefined;
+    }
+    getSuggestions(ctx: EditorSuggestContext) { const q = ctx.query.toLowerCase(); return this.plugin.targets().filter(r => (this.kind !== 'eqref' || r.kind === 'equation') && (this.kind !== 'tref' || r.kind === 'theorem')).filter(r => (Engine.refText(r, this.plugin.settings, this.labelFor(r, ctx.query)) + ' ' + r.path + ' ' + (r.title || r.tex)).toLowerCase().includes(q)).slice(0, 30); }
+    renderSuggestion(r: SourceRecord, el: HTMLElement) { el.createDiv({ text: Engine.refText(r, this.plugin.settings, this.labelFor(r)) || '', cls: 'an-suggest-title' }); el.createDiv({ text: (r.title || r.tex || '').slice(0, 130) + ' — ' + r.path, cls: 'an-suggest-detail' }); }
     selectSuggestion(r: SourceRecord) { const c = this.context; if (!c?.file)
         return; const latex = this.math && (this.kind === 'eqref' || this.kind === 'ref' || this.kind === 'tref');
-        c.editor.replaceRange(latex ? this.plugin.makeLatexReference(r, c.file.path, this.kind === 'eqref' ? 'eqref' : 'ref') : this.plugin.makeReference(r, c.file.path), c.start, c.end); this.close(); this.plugin.scheduleIndex(); }
+        c.editor.replaceRange(latex ? this.plugin.makeLatexReference(r, c.file.path, this.kind === 'eqref' ? 'eqref' : 'ref', this.labelFor(r)) : this.plugin.makeReference(r, c.file.path), c.start, c.end); this.close(); this.plugin.scheduleIndex(); }
 }
 class BookPicker extends Modal {
     plugin: AcademicNotes;

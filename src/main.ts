@@ -303,10 +303,10 @@ export default class AcademicNotes extends Plugin {
             const affected = new Set<string>(), allViews = renderKey !== this.renderKey;
             for (const note of notes) {
                 const labels = JSON.stringify([
-                    note.records.map(r => [r.key, r.id, r.number, r.referenced, r.rowNumbers]),
+                    note.records.map(r => [r.key, r.id, r.number, r.referenced, r.rowNumbers, r.rowTags]),
                     note.refs.map(r => {
-                        const key = r.label ? Engine.labelTarget(r.label)?.block : undefined;
-                        return [r.targetPath, r.target && Engine.refText(r.target, this.settings), r.target && key ? r.target.rowNumbers?.[key] ?? r.target.number : null];
+                        const key = r.block;
+                        return [r.targetPath, r.target && Engine.refText(r.target, this.settings, key), r.target ? r.target.rowNumbers?.[key] ?? null : null];
                     })
                 ]);
                 const previous = this.renderStates.get(note.path);
@@ -494,7 +494,7 @@ export default class AcademicNotes extends Plugin {
         void this.openReferenceLabel(label, path, !!(event.ctrlKey || event.metaKey)).catch(error => this.fail(t("打开公式引用"), error));
     }
     makeReference(record: SourceRecord, sourcePath: string) { const target = record.path === sourcePath ? '' : record.path.replace(/\.md$/i, ''); return '[[' + target + '#^' + record.id + ']]'; }
-    makeLatexReference(record: SourceRecord, sourcePath: string, command: 'eqref' | 'ref' = 'eqref') { const target = record.path === sourcePath ? '' : record.path.replace(/\.md$/i, '') + '#^'; return '\\' + command + '{' + target + record.id + '}'; }
+    makeLatexReference(record: SourceRecord, sourcePath: string, command: 'eqref' | 'ref' = 'eqref', label?: string) { const target = record.path === sourcePath ? '' : record.path.replace(/\.md$/i, '') + '#^'; return '\\' + command + '{' + target + (label || record.id) + '}'; }
     targets() { return this.graph ? [...this.graph.notes.values()].flatMap(n => n.records.filter(r => r.id)) : []; }
     pluginDir() { return this.manifest.dir || normalizePath(this.app.vault.configDir + '/plugins/' + this.manifest.id); }
     async mkdir(folder: string) { let p = ''; for (const part of safeFolder(folder).split('/')) {
@@ -611,7 +611,7 @@ export default class AcademicNotes extends Plugin {
         }
         for (const r of note.refs)
             if (!r.embed && r.target && (!this.settings.respectAliases || r.alias === null) && r.syntax === 'wiki') {
-                const label = Engine.refText(r.target, graph.settings)!.replace(/\|/g, '\\|').replace(/\]/g, '');
+                const label = Engine.refText(r.target, graph.settings, r.block)!.replace(/\|/g, '\\|').replace(/\]/g, '');
                 replacements.push({ from: r.from, to: r.to, text: '[[' + r.raw + '|' + label + ']]' });
             }
         let text = note.source;
@@ -660,7 +660,7 @@ export default class AcademicNotes extends Plugin {
                 for (const rec of note.records) {
                     const old = original.records.find(r => r.from === rec.from && r.kind === rec.kind);
                     if (old)
-                        Object.assign(rec, { number: old.number, prefix: old.prefix, subletter: old.subletter, referenced: old.referenced, rowNumbers: old.rowNumbers });
+                        Object.assign(rec, { number: old.number, prefix: old.prefix, subletter: old.subletter, referenced: old.referenced, rowNumbers: old.rowNumbers, rowTags: old.rowTags });
                 }
             }
             warnings.push(t("保留笔记编号模式：不同章节可能显示相同编号；跳转仍按文件路径和块 ID 区分。"));
@@ -758,7 +758,7 @@ export default class AcademicNotes extends Plugin {
             stage.querySelectorAll<HTMLElement>('.an-uniform-height').forEach(updateFigureImageRatio);
             if (stage.querySelector('[data-mml-node="merror"],mjx-merror'))
                 throw new Error(t("检测到数学渲染错误，已停止 PDF 导出；请先检查原公式。"));
-            const opts = { ...options, preNumbered: true, toc: true }, meta = { ...opts, ...DocCore.prepare(stage, opts), nativeSnapshot: true, numberingMode: options.book ? this.settings.exportNumbering : 'note', targets: notes.flatMap(n => n.records.filter(r => r.id).map(r => ({ path: r.path, block: r.id, kind: r.kind, number: r.number, reference: Engine.refText(r, graph.settings) }))) };
+            const opts = { ...options, preNumbered: true, toc: true }, meta = { ...opts, ...DocCore.prepare(stage, opts), nativeSnapshot: true, numberingMode: options.book ? this.settings.exportNumbering : 'note', targets: notes.flatMap(n => n.records.filter(r => r.id).map(r => ({ path: r.path, block: r.id, kind: r.kind, number: r.number, reference: Engine.refText(r, graph.settings, r.id ?? undefined) }))) };
             meta.warnings.push(...warnings);
             // Export every globally cached MathJax glyph used by the snapshot.
             const svg = doc.win.createSvg('svg'), defs = doc.win.createSvg('defs');

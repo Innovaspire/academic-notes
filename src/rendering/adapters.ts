@@ -225,7 +225,7 @@ function renderFragment(el: HTMLElement, note: ParsedNote | undefined, graph: No
             continue;
         if (graph.settings.respectAliases && ref.alias !== null)
             continue;
-        const text = Engine.refText(r, graph.settings);
+        const text = Engine.refText(r, graph.settings, ref.block);
         if (a.textContent !== text)
             a.textContent = text;
         setClass(a, 'an-ref');
@@ -298,7 +298,7 @@ function createLiveExtension(plugin: AcademicNotes) {
                     continue;
                 if (!view.visibleRanges.some(v => ref.to >= v.from && ref.from <= v.to))
                     continue;
-                const text = Engine.refText(ref.target, plugin.settings);
+                const text = Engine.refText(ref.target, plugin.settings, ref.block);
                 ranges.push(Decoration.replace({ widget: new LinkWidget(text || '', ref.raw, note.path, ref.from) }).range(ref.from, ref.to));
             }
             return Decoration.set(ranges, true);
