@@ -41,6 +41,13 @@ export async function runWorkflowRegressions() {
     view.file=a;active=a;buffer='> [!thm] Another\n> Body\n\nReference: ';await plugin.rebuild();
     await plugin.insertReference(editor,a,plugin.graph!.notes.get(a.path)!.records[0]);
     const same=Engine.parse(a.path,buffer);check(same.refs.length===1&&same.refs[0].block===same.records[0].id,'Same-note offsets must account for the newly inserted ID');
+    const math = add('Math.md', String.raw`$$\begin{align*}a=b \label{first} \\ c=d \label{second}\end{align*}$$`);
+    view.file=b;active=b;buffer='$$'; await plugin.rebuild();
+    const rowTarget=plugin.targets(false).find(r=>r.path===math.path&&r.id==='second')!;
+    check(rowTarget,'Second row must appear as a selectable reference target');
+    await plugin.insertReference(editor,b,rowTarget,editor.getCursor(),editor.getCursor(),'eqref','second');
+    check(buffer==='$$'+String.raw`\eqref{Math#^second}`,'Safe insertion must retain selected row and math syntax');
+    view.file=a;active=a;buffer=texts.get(a.path)!;
     // Save then reopen a manifest, retaining user properties and handwritten prose.
     const book:any=new BookPicker(plugin);book.open();book.selected=[a,b];book.title='Study: notes';book.titles.set(a.path,'Chapter A');book.destination='Collection.md';
     const click=(root:HTMLElement,label:string)=>{const b=[...root.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent===label);check(b,'Missing '+label);b!.click();};

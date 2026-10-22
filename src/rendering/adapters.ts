@@ -119,19 +119,34 @@ function mediaRecord(box: HTMLElement, r: SourceRecord | null | undefined, setti
                 setClass(child, 'an-empty-anchor');
     }
 }
-function mathRecord(mjx: HTMLElement, r: SourceRecord | null | undefined) {
+function mathRecord(mjx: HTMLElement, r: SourceRecord | null | undefined, note: ParsedNote, graph: NoteGraph) {
     if (!r || editableLiveNode(mjx))
         return false;
-    const tex = Engine.taggedTex(r), signature = JSON.stringify([tex, r.number]);
+    const tex = Engine.taggedTex(r, label => graph.resolveLabel(label, note.path), true);
+    const signature = JSON.stringify([tex, r.number]);
     if (mjx.dataset.anMath === signature)
         return false;
     mjx.dataset.anMath = signature;
     mjx.dataset.anLine = String(r.line);
-    if (r.manual || r.multiTag)
-        return false; // Native rendering owns explicit tags.
+    mjx.dataset.anPath = note.path;
+    // Native rendering owns explicit tags unless \label/\eqref changed the source.
+    if ((r.manual || r.multiTag) && tex === (r.tex || ''))
+        return false;
     const rendered = Obs.renderMath(tex, true);
     // Retain the host element, native events, source mapping, and its outer layout wrapper.
     mjx.replaceChildren(...rendered.childNodes);
+    for (const a of mjx.querySelectorAll<HTMLAnchorElement>('a')) {
+        const href = a.getAttribute('href') || a.getAttribute('xlink:href') || '';
+        if (!href.startsWith('an-eqref:')) continue;
+        const label = Engine.decodeLabel(href.slice('an-eqref:'.length));
+        if (!label)
+            continue;
+        a.dataset.anEqref = label;
+        a.removeAttribute('href'); a.removeAttribute('xlink:href');
+        a.classList.add('an-eqref');
+        a.setAttribute('role', 'link');
+        a.setAttribute('tabindex', '0');
+    }
     for (const key of ['style', 'jax', 'display', 'width']) {
         if (rendered.hasAttribute(key))
             mjx.setAttribute(key, rendered.getAttribute(key)!);
@@ -189,7 +204,7 @@ function renderFragment(el: HTMLElement, note: ParsedNote | undefined, graph: No
     for (const mjx of allNodes(el, 'mjx-container[display="true"]')) {
         const r = pick(mjx, note.equations);
         if (r)
-            mathChanged = mathRecord(mjx, r) || mathChanged;
+            mathChanged = mathRecord(mjx, r, note, graph) || mathChanged;
     }
     markMathContinuations(el, note, infoFor);
     if (mathChanged)
@@ -212,7 +227,7 @@ function renderFragment(el: HTMLElement, note: ParsedNote | undefined, graph: No
             continue;
         if (graph.settings.respectAliases && ref.alias !== null)
             continue;
-        const text = Engine.refText(r, graph.settings);
+        const text = Engine.refText(r, graph.settings, ref.block);
         if (a.textContent !== text)
             a.textContent = text;
         setClass(a, 'an-ref');
@@ -285,7 +300,7 @@ function createLiveExtension(plugin: AcademicNotes) {
                     continue;
                 if (!view.visibleRanges.some(v => ref.to >= v.from && ref.from <= v.to))
                     continue;
-                const text = Engine.refText(ref.target, plugin.settings);
+                const text = Engine.refText(ref.target, plugin.settings, ref.block);
                 ranges.push(Decoration.replace({ widget: new LinkWidget(text || '', ref.raw, note.path, ref.from) }).range(ref.from, ref.to));
             }
             return Decoration.set(ranges, true);

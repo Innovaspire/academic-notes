@@ -236,11 +236,11 @@ function prepare(root: HTMLElement, options: {
                 if (Array.isArray(parsed)) keys.push(...parsed.filter((key): key is string => typeof key === 'string'));
             }
             catch { /* Malformed optional block metadata is ignored. */ }
-            keys = [...new Set(keys.filter(k => typeof k === 'string' && /^[A-Za-z0-9-]+$/.test(k)))];
+            keys = [...new Set(keys.filter(k => typeof k === 'string' && !!k && !/[\s#|[\]{}]/.test(k)))];
             if (!keys.length)
                 return;
             if (!e.id)
-                e.id = `phb-c${i + 1}-b-${keys[0]}`;
+                e.id = `phb-c${i + 1}-b-${Array.from(keys[0], c => c.codePointAt(0)!.toString(16)).join('-')}`;
             for (const k of keys) {
                 if (map.has('^' + k) && map.get('^' + k) !== e.id) {
                     map.set('^' + k, null);
@@ -279,7 +279,7 @@ function prepare(root: HTMLElement, options: {
     // Resolve wiki and ordinary fragment links AFTER every chapter's IDs exist.
     for (const ch of chapters)
         for (const a of ch.querySelectorAll<HTMLAnchorElement>('a[href],a[data-href]')) {
-            if (a.closest('svg,mjx-container,.phb-toc'))
+            if (a.closest('.phb-toc') || a.closest('svg,mjx-container') && a.dataset.phbCanonical !== 'true')
                 continue;
             const raw = decode(a.dataset.phbLink || a.dataset.href || a.getAttribute('href') || '');
             if (/^(https?:|mailto:|tel:|data:|obsidian:)/i.test(raw))
@@ -295,14 +295,14 @@ function prepare(root: HTMLElement, options: {
             }
             const id = a.dataset.phbMissing === 'true' ? undefined : target !== undefined ? maps.get(target)?.get(sub) : undefined;
             if (id) {
-                a.href = '#' + id;
+                a.setAttribute('href', '#' + id);
                 a.dataset.phbResolved = id;
             }
             else if (a.classList.contains('internal-link') || raw.startsWith('#') || /\.md(?:#|$)/i.test(raw)) {
                 warnings.push(t("未纳入书籍或无法定位的链接：{0} -> {1}", ch.dataset.path, raw));
                 a.dataset.phbUnresolved = 'true';
                 if (file)
-                    a.href = 'obsidian://open?file=' + encodeURIComponent(file + (sub ? '#' + sub : ''));
+                    a.setAttribute('href', 'obsidian://open?file=' + encodeURIComponent(file + (sub ? '#' + sub : '')));
             }
         }
     // Existing live TOC markup is replaced, not appended to a second time.

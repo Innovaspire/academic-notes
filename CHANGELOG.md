@@ -199,6 +199,15 @@
 
 # Changelog
 
+## 2.15.4
+
+- Integrate Innovaspire's LaTeX equation references and row-numbering contribution (#2), retaining the original commits.
+- Resolve display-math labels and cross-file references in Reading view, Live Preview and HTML/PDF exports.
+- Make row numbering obey all/referenced/none, preserve explicit tags, respect row suppression, and diagnose unnumbered or ambiguous targets.
+- Preserve safe reference insertion into unsaved notes, expose row labels in suggestions, and retain portable native links in generated catalogs.
+- Fix comment-aware environment conversion and validate CHTML/SVG rendering, chapter numbering and export destinations.
+
+
 ## 2.2.0 — Community release candidate
 
 - Adopt `academic-notes` as the release ID and a reproducible TypeScript/esbuild build.

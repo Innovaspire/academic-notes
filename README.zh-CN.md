@@ -51,6 +51,8 @@
 
 [目录与导出](https://github.com/Kristal-Boltinn/academic-notes/wiki/Contents-and-export-ZH)
 
+显示公式支持 LaTeX 标签、跨文件引用、按行编号与导出链接，详见[公式引用指南](https://github.com/Kristal-Boltinn/academic-notes/wiki/LaTeX-equation-references-ZH)。
+
 ## 桌面与移动端
 
 需要 **Obsidian 1.9.0 或更高版本**。数学环境、编号、引用、索引、外观工具和 HTML 快照可在桌面与移动端使用。**PDF 导出仅限桌面版**，使用 Obsidian 自带的 Electron，无需另外安装导出引擎。界面跟随 Obsidian 的语言，提供英文与简体中文。
@@ -70,6 +72,10 @@ Beta 功能有明确的适用范围，排版与触屏表现也可能受到设备
 ## 许可
 
 采用 [MIT](LICENSE) 许可。依赖许可与致谢见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
+
+## 贡献者
+
+感谢 [Innovaspire](https://github.com/Innovaspire) 在 [PR #2](https://github.com/Kristal-Boltinn/academic-notes/pull/2) 中贡献 LaTeX 公式引用和逐行编号功能。
 
 ## 支持与反馈
 

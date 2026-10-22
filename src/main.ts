@@ -1,3 +1,4 @@
+import { prepareMathLinks } from './export/math-links';
 import { markMathContinuations } from './typography/continuations';
 import { paletteValues, selectedPalette, basePalette, appearanceRoles, migratePaletteSettings } from './rendering/palettes';
 import { algorithmProcessor, algorithmRecord, finishAlgorithms } from './algorithms/render';
@@ -176,6 +177,11 @@ export default class AcademicNotes extends Plugin {
         if (typeof this.settings.excludedFolders !== 'string')
             this.settings.excludedFolders = '';
         this.applyAppearance();
+        this.registerDomEvent(document, 'click', event => this.followEquationReference(event), true);
+        this.registerDomEvent(document, 'keydown', event => {
+            if (event.key === 'Enter' || event.key === ' ')
+                this.followEquationReference(event);
+        }, true);
         this.themeObserver = new MutationObserver(() => this.applyAppearance());
         this.themeObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
         this.register(() => this.themeObserver.disconnect());
@@ -301,7 +307,13 @@ export default class AcademicNotes extends Plugin {
             if (changed) { this.graph = Engine.graph(notes, this.settings, (n, h) => this.resolver(n, h)); metrics.graphRebuilt = true; }
             const affected = new Set<string>(), allViews = renderKey !== this.renderKey;
             for (const note of notes) {
-                const labels = JSON.stringify([note.records.map(r => [r.key, r.id, r.number, r.referenced]), note.refs.map(r => [r.targetPath, r.target && Engine.refText(r.target, this.settings)])]);
+                const labels = JSON.stringify([
+                    note.records.map(r => [r.key, r.id, r.number, r.referenced, r.rowNumbers, r.rowTags]),
+                    note.refs.map(r => {
+                        const key = r.block;
+                        return [r.targetPath, r.target && Engine.refText(r.target, this.settings, key), r.target ? r.target.rowNumbers?.[key] ?? null : null];
+                    })
+                ]);
                 const previous = this.renderStates.get(note.path);
                 if (allViews || changed && note.source.includes('<!-- academic-notes:index:start') || !previous || previous.source !== note.source || previous.labels !== labels) affected.add(note.path);
                 this.renderStates.set(note.path, { source: note.source, labels });
@@ -446,10 +458,7 @@ export default class AcademicNotes extends Plugin {
         this.scheduleIndex();
         new Notice(t('已添加 ^{0}；可用 [[#^{0}]] 引用。', id));
     }
-    async openReference(raw: string, sourcePath: string, newLeaf = false) {
-        const rec = this.graph?.resolve(raw, sourcePath);
-        if (!rec)
-            return this.app.workspace.openLinkText(raw, sourcePath, newLeaf);
+    private async openRecord(rec: SourceRecord, newLeaf = false) {
         const file = this.app.vault.getAbstractFileByPath(rec.path);
         if (!(file instanceof TFile))
             throw new Error(t("引用目标文件不存在：") + rec.path);
@@ -465,8 +474,29 @@ export default class AcademicNotes extends Plugin {
             }
         }
     }
+    async openReference(raw: string, sourcePath: string, newLeaf = false) {
+        const rec = this.graph?.resolve(raw, sourcePath);
+        if (!rec)
+            return this.app.workspace.openLinkText(raw, sourcePath, newLeaf);
+        return this.openRecord(rec, newLeaf);
+    }
+    async openReferenceLabel(label: string, sourcePath: string, newLeaf = false) {
+        const rec = this.graph?.resolveLabel(label, sourcePath);
+        if (rec)
+            return this.openRecord(rec, newLeaf);
+    }
+    followEquationReference(event: MouseEvent | KeyboardEvent) {
+        const link = (event.target as Element | null)?.closest?.<HTMLElement>('[data-an-eqref]'), host = link?.closest<HTMLElement>('[data-an-path]');
+        const label = link?.dataset.anEqref, path = host?.dataset.anPath;
+        if (!label || !path)
+            return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        void this.openReferenceLabel(label, path, !!(event.ctrlKey || event.metaKey)).catch(error => this.fail(t("打开公式引用"), error));
+    }
     makeReference(record: SourceRecord, sourcePath: string) { const target = record.path === sourcePath ? '' : record.path.replace(/\.md$/i, ''); return '[[' + target + '#^' + record.id + ']]'; }
-    async insertReference(editor: Editor, file: TFile, target: SourceRecord, from = editor.getCursor('from'), to = editor.getCursor('to')) {
+    async insertReference(editor: Editor, file: TFile, target: SourceRecord, from = editor.getCursor('from'), to = editor.getCursor('to'), command?: 'eqref' | 'ref', label?: string) {
+        const format = (r: SourceRecord) => command ? this.makeLatexReference(r, file.path, command, label) : this.makeReference({ ...r, id: label || r.id }, file.path);
         const initial = editor.getValue(), start = editor.posToOffset(from), end = editor.posToOffset(to);
         const original = this.graph?.notes.get(target.path)?.source;
         const targetFile = this.app.vault.getAbstractFileByPath(target.path);
@@ -474,10 +504,11 @@ export default class AcademicNotes extends Plugin {
         let resolved: SourceRecord;
         const update = (source: string) => {
             resolved = currentRecord(source, original, target, this.settings);
+            if (label && (!resolved.ids.includes(label) || Engine.parse(target.path, source, {}, this.settings).blocks.get(label)?.from !== resolved.from)) throw new Error(t('目标块标签重复'));
             const insertion = resolved.id ? undefined : labelInsertion(source, resolved, this.settings);
             if (insertion) resolved = { ...resolved, id: insertion.id, ids: [insertion.id] };
             const edits = insertion ? [{ from: insertion.at, to: insertion.at, text: insertion.text }] : [];
-            if (target.path === file.path) edits.push({ from: start, to: end, text: this.makeReference(resolved, file.path) });
+            if (target.path === file.path) edits.push({ from: start, to: end, text: format(resolved) });
             for (const edit of edits.sort((a,b) => b.from - a.from)) source = source.slice(0, edit.from) + edit.text + source.slice(edit.to);
             return source;
         };
@@ -486,11 +517,12 @@ export default class AcademicNotes extends Plugin {
             await editNote(this, targetFile, update);
             const attached = this.app.workspace.getLeavesOfType('markdown').some(leaf => leaf.view instanceof MarkdownView && leaf.view.editor === editor && leaf.view.file?.path === file.path);
             if (!attached || editor.getValue() !== initial) throw new Error(t('目标标签已准备好，但当前笔记已变化，请重新插入引用。'));
-            editor.replaceRange(this.makeReference({ ...resolved!, path: targetFile.path }, file.path), from, to);
+            editor.replaceRange(format({ ...resolved!, path: targetFile.path }), from, to);
         }
         this.dirty.set(target.path, true); this.dirty.set(file.path, true); this.scheduleIndex();
     }
-    targets(labelledOnly = true) { return this.graph ? [...this.graph.notes.values()].flatMap(n => n.records.filter(r => !labelledOnly || r.id)) : []; }
+    makeLatexReference(record: SourceRecord, sourcePath: string, command: 'eqref' | 'ref' = 'eqref', label?: string) { const target = record.path === sourcePath ? '' : record.path.replace(/\.md$/i, '') + '#^'; return '\\' + command + '{' + target + (label || record.id) + '}'; }
+    targets(labelledOnly = true) { return this.graph ? [...this.graph.notes.values()].flatMap(n => n.records.filter(r => !labelledOnly || r.id).flatMap(r => r.rowGroups ? [...new Set([...(r.id ? [r.id] : []), ...r.rowGroups.flat()])].filter(id => n.blocks.get(id) === r).map(id => ({ ...r, id })) : [r])) : []; }
     pluginDir() { return this.manifest.dir || normalizePath(this.app.vault.configDir + '/plugins/' + this.manifest.id); }
     async mkdir(folder: string) { let p = ''; for (const part of safeFolder(folder).split('/')) {
         p += (p ? '/' : '') + part;
@@ -607,15 +639,16 @@ export default class AcademicNotes extends Plugin {
     exportSource(note: ParsedNote, graph: NoteGraph) {
         const replacements: { from: number; to: number; text: string }[] = [];
         for (const eq of note.equations) {
-            if (eq.manual || eq.multiTag)
+            const tex = Engine.taggedTex(eq, label => graph.resolveLabel(label, note.path), true);
+            if ((eq.manual || eq.multiTag) && tex === (eq.tex || ''))
                 continue;
-            const tex = Engine.taggedTex(eq), q = Engine.quote(note.lines[eq.line]).prefix;
+            const q = Engine.quote(note.lines[eq.line]).prefix;
             const math = tex.includes('\n') ? '$$\n' + tex.split('\n').map(l => q + l).join('\n') + '\n' + q + '$$' : '$$' + tex + '$$';
             replacements.push({ from: eq.from, to: eq.to, text: math });
         }
         for (const r of note.refs)
             if (!r.embed && r.target && (!this.settings.respectAliases || r.alias === null) && r.syntax === 'wiki') {
-                const label = Engine.refText(r.target, graph.settings)!.replace(/\|/g, '\\|').replace(/\]/g, '');
+                const label = Engine.refText(r.target, graph.settings, r.block)!.replace(/\|/g, '\\|').replace(/\]/g, '');
                 replacements.push({ from: r.from, to: r.to, text: '[[' + r.raw + '|' + label + ']]' });
             }
         let text = note.source;
@@ -667,7 +700,7 @@ export default class AcademicNotes extends Plugin {
                 for (const rec of note.records) {
                     const old = original.records.find(r => r.from === rec.from && r.kind === rec.kind);
                     if (old)
-                        Object.assign(rec, { number: old.number, prefix: old.prefix, subletter: old.subletter, referenced: old.referenced });
+                        Object.assign(rec, { number: old.number, prefix: old.prefix, subletter: old.subletter, referenced: old.referenced, rowNumbers: old.rowNumbers, rowTags: old.rowTags, rows: old.rows });
                 }
             }
             warnings.push(t("保留笔记编号模式：不同章节可能显示相同编号；跳转仍按文件路径和块 ID 区分。"));
@@ -744,9 +777,9 @@ export default class AcademicNotes extends Plugin {
                 const realIds = new Set([...section.querySelectorAll<HTMLElement>('[data-phb-block]:not(.phb-anchor)')].map(e => e.dataset.phbBlock));
                 section.querySelectorAll<HTMLElement>('.phb-anchor').forEach(e => { if (realIds.has(e.dataset.phbBlock))
                     e.remove(); });
+                prepareMathLinks(section, graph, f.path);
                 for (const a of section.querySelectorAll<HTMLElement>('a[href],a[data-href]')) {
-                    if (a.closest('svg,mjx-container'))
-                        continue;
+                    if (a.closest('svg,mjx-container')) continue;
                     const raw = a.dataset.phbLink || a.dataset.href || a.getAttribute('href') || '', ref = Engine.splitTarget(raw), target = ref && graph.resolve(raw, f.path);
                     if (target) {
                         a.classList.add('an-ref');
@@ -769,7 +802,7 @@ export default class AcademicNotes extends Plugin {
             stage.querySelectorAll<HTMLElement>('.an-uniform-height').forEach(updateFigureImageRatio);
             if (stage.querySelector('[data-mml-node="merror"],mjx-merror'))
                 throw new Error(t("检测到数学渲染错误，已停止 PDF 导出；请先检查原公式。"));
-            const opts = { ...options, preNumbered: true, toc: true }, meta = { ...opts, ...DocCore.prepare(stage, opts), nativeSnapshot: true, numberingMode: options.book ? this.settings.exportNumbering : 'note', targets: notes.flatMap(n => n.records.filter(r => r.id).map(r => ({ path: r.path, block: r.id, kind: r.kind, number: r.number, reference: Engine.refText(r, graph.settings) }))) };
+            const opts = { ...options, preNumbered: true, toc: true }, meta = { ...opts, ...DocCore.prepare(stage, opts), nativeSnapshot: true, numberingMode: options.book ? this.settings.exportNumbering : 'note', targets: notes.flatMap(n => n.records.flatMap(r => r.ids.filter(id => n.blocks.get(id) === r).map(id => ({ path: r.path, block: id, kind: r.kind, number: Engine.referenceNumber(r, id), reference: Engine.refText(r, graph.settings, id) })))) };
             meta.warnings.push(...warnings);
             // Export every globally cached MathJax glyph used by the snapshot.
             const svg = doc.win.createSvg('svg'), defs = doc.win.createSvg('defs');

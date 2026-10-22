@@ -12,6 +12,7 @@ export class Plugin {
   registerEditorExtension() {}
   registerEditorSuggest() {}
   registerEvent() {}
+  registerDomEvent() {}
   register() {}
 }
 export const apiVersion = 'test';

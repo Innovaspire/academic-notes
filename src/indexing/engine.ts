@@ -34,6 +34,13 @@ export interface SourceRecord {
     algorithm?: AlgorithmData;
     algorithmError?: string;
     environment?: CustomEnvironment;
+    /** Labels grouped by the multi-line row they belong to; each group gets one number. */
+    rowGroups?: string[][];
+    rows?: { from: number; to: number; labels: string[]; tag?: string; suppress: boolean; number?: string }[];
+    /** Row labels whose row carries an explicit \tag, mapped to that tag. */
+    rowTags?: Record<string, string>;
+    /** Every label in a numbered row, mapped to that row's number. */
+    rowNumbers?: Record<string, string>;
 }
 export interface SourceReference {
     file: string;
@@ -45,6 +52,8 @@ export interface SourceReference {
     to: number;
     line: number;
     syntax: string;
+    command?: 'eqref' | 'ref';
+    label?: string;
     targetPath?: string | null;
     target?: SourceRecord | null;
 }
@@ -155,6 +164,7 @@ function parse(path: string, source: string, cache: {
     lines.forEach(l => { starts.push(offset); offset += l.length + 1; });
     let mask = maskedSource(source);
     const records: SourceRecord[] = [], equations: SourceRecord[] = [], theorems: SourceRecord[] = [], media: SourceRecord[] = [], callouts: SourceRecord[] = [], warnings: string[] = [];
+    const labelBindings: { rec: SourceRecord; names: string[] }[] = [], latexReferences: SourceReference[] = [];
     const algorithms = algorithmBlocks(source);
     for (const block of algorithms) {
         mask = mask.slice(0, block.from) + blank(mask.slice(block.from, block.to)) + mask.slice(block.to);
@@ -178,12 +188,37 @@ function parse(path: string, source: string, cache: {
         const tex = source.slice(from + 2, close).split('\n').map((l, i) => { if (!i || !depth)
             return l; for (let d = 0; d < depth; d++)
             l = l.replace(/^[ \t]*>[ \t]?/, ''); return l; }).join('\n').trim();
-        const tags = [...tex.replace(/(?<!\\)%[^\n]*/g, '').matchAll(/\\tag(\*)?\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g)];
+        const maskedTex = maskComments(tex);
+        const tags = [...maskedTex.matchAll(/\\tag(\*)?\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g)];
         const rec: SourceRecord = { kind: 'equation', key: 'equation', path, line, endLine, from, to, depth: quote(lines[line]).depth,
             tex, id: null, manual: tags.length === 1 ? tags[0][2] : null, multiTag: tags.length > 1,
-            suppress: /\\(?:notag|nonumber)\b/.test(tex) && tags.length === 0, number: '', ids: [] };
-        if (rec.multiTag)
+            suppress: /\\(?:notag|nonumber)\b/.test(maskedTex) && tags.length === 0, number: '', ids: [] };
+        // \label and \eqref are ordinary LaTeX commands; their names are block IDs.
+        const latex = latexCommands(tex);
+        if (latex.labels.length)
+            labelBindings.push({ rec, names: latex.labels.map(label => label.name) });
+        // A label directly on a row of a multi-line environment numbers that row.
+        const env = rowEnvironment(tex);
+        if (env && ROW_ENVIRONMENTS.has(env.name)) {
+            const rows = rowGroups(env.body, latex.labels, env.bodyStart);
+            if (rows.multi && rows.groups.some(g => g.length) && !['split', 'multline', 'multline*'].includes(env.name)) {
+                rec.rowGroups = rows.groups;
+                rec.rows = rows.rows;
+                rec.rowTags = rows.tags;
+            }
+        }
+        if (rec.multiTag && !rec.rows)
             warnings.push(t("{0}:{1} 含多个手写 tag，保留公式但不猜测整块引用编号。", path, line + 1));
+        const content = source.slice(from + 2, close), lead = content.length - content.trimStart().length;
+        const leadLines = (content.slice(0, lead).match(/\n/g) || []).length;
+        for (const ref of latex.refs) {
+            const target = labelTarget(ref.label);
+            if (!target)
+                continue;
+            const at = from + 2 + lead + ref.index, refLine = line + leadLines + (tex.slice(0, ref.index).match(/\n/g) || []).length;
+            latexReferences.push({ file: target.file, block: target.block, raw: ref.source, alias: null, embed: false,
+                from: at, to: at + ref.source.length, line: refLine, syntax: 'latex', command: ref.command, label: ref.label });
+        }
         equations.push(rec);
         records.push(rec);
     }
@@ -247,6 +282,9 @@ function parse(path: string, source: string, cache: {
         rec.id = id; }
     const ids = [...prose.matchAll(/(?:^|[ \t])\^([A-Za-z0-9-]+)[ \t]*\r?$/gm)];
     const anchors = new Map<string, number[]>();
+    // Native IDs include ones on ordinary paragraphs, which are not records but can
+    // still collide with a \label name.
+    const nativeOwners = new Map<string, SourceRecord | null>();
     for (const m of ids) {
         const ln = lineOf(starts, m.index + m[0].indexOf('^')), q = quote(lines[ln]);
         const locations = anchors.get(m[1]) || []; locations.push(ln); anchors.set(m[1], locations);
@@ -269,13 +307,36 @@ function parse(path: string, source: string, cache: {
         if (eq)
             rec = eq;
         bind(rec, m[1]);
+        nativeOwners.set(m[1], rec ?? null);
     }
     for (const block of algorithms) {
         const rec = records.find(r => r.kind === 'algorithm' && r.from === block.from);
-        for (const id of block.ids) bind(rec, id);
+        for (const id of block.ids) {
+            bind(rec, id);
+            nativeOwners.set(id, rec ?? null);
+        }
         for (let line = block.line; line <= block.endLine; line++) {
             const id = quote(lines[line]).body.trim().match(/^\^([A-Za-z0-9-]+)$/)?.[1];
             if (id && block.ids.includes(id)) { const locations = anchors.get(id) || []; if (!locations.includes(line)) locations.push(line); anchors.set(id, locations); }
+        }
+    }
+    // Explicit ^id markers stay canonical; \label names are additional aliases.
+    for (const { rec, names } of labelBindings)
+        for (const name of names) {
+            // A native ID on another target (or on an ordinary paragraph, which has
+            // no record) must be reported instead of silently shadowed by \label.
+            if (nativeOwners.has(name) && (nativeOwners.get(name) !== rec || (anchors.get(name)?.length ?? 0) > 1)) {
+                blocks.set(name, null);
+                warnings.push(t("{0}: 块 ID ^{1} 与同名 \\label 指向不同目标，不解析歧义引用。", path, name));
+                continue;
+            }
+            bind(rec, name);
+        }
+    for (const rec of equations) {
+        const seen = new Set<string>();
+        for (const row of rec.rows || []) for (const name of new Set(row.labels)) {
+            if (seen.has(name)) { blocks.set(name, null); warnings.push(t('目标块标签重复') + ': ' + name); }
+            seen.add(name);
         }
     }
     // Cache supplements missing bindings; it must not overwrite an explicit nested subfigure ID.
@@ -290,7 +351,7 @@ function parse(path: string, source: string, cache: {
             bind(rec, id);
         }
     }
-    const refs: SourceReference[] = [];
+    const refs: SourceReference[] = [...latexReferences];
     for (const m of prose.matchAll(/(!?)\[\[([^\]\n]+)\]\]/g)) {
         const pieces = m[2].split(/(?<!\\)\|/), raw = pieces.shift()!.trim().replace(/\\\|/g, '|');
         const target = splitTarget(raw);
@@ -322,12 +383,120 @@ function parse(path: string, source: string, cache: {
 }
 function splitTarget(raw: string) {
     raw = decode(raw);
+    // LaTeX labels may contain ':' and '.', so plugin-resolved block IDs are wider
+    // than Obsidian's native [A-Za-z0-9-] block IDs.
+    const block = (value: string) => !!value && !/[\s#|[\]]/.test(value);
     let at = raw.indexOf('#^');
-    if (at >= 0 && /^[A-Za-z0-9-]+$/.test(raw.slice(at + 2)))
+    if (at >= 0 && block(raw.slice(at + 2)))
         return { file: raw.slice(0, at), block: raw.slice(at + 2) };
-    if (/^\^[A-Za-z0-9-]+$/.test(raw))
+    if (raw.startsWith('^') && block(raw.slice(1)))
         return { file: '', block: raw.slice(1) };
     return null;
+}
+/** A LaTeX label may be a bare block ID, ^id, #^id or a cross-file file#^id. */
+function labelTarget(raw: string) {
+    const value = decode(String(raw || '')).trim();
+    if (!value || /[{}]/.test(value))
+        return null;
+    const at = value.indexOf('#');
+    if (at >= 0) {
+        const file = value.slice(0, at).trim(), block = value.slice(at + 1).replace(/^\^/, '').trim();
+        return block ? { file, block } : null;
+    }
+    const block = value.replace(/^\^/, '').trim();
+    return block ? { file: '', block } : null;
+}
+/** Blanks TeX comments while preserving offsets and line breaks. */
+function maskComments(tex: string) {
+    const chars = tex.split('');
+    for (let i = 0; i < chars.length; i++) {
+        if (chars[i] !== '%')
+            continue;
+        // An even number of preceding backslashes means the percent is unescaped;
+        // "\\%" is a row break followed by a comment, not an escaped percent.
+        let slashes = 0;
+        for (let j = i - 1; j >= 0 && chars[j] === '\\'; j--)
+            slashes++;
+        if (slashes % 2)
+            continue;
+        while (i < chars.length && chars[i] !== '\n')
+            chars[i++] = ' ';
+    }
+    return chars.join('');
+}
+function latexCommands(tex: string) {
+    // Mask comments while preserving offsets so edits do not shift source lines.
+    const masked = maskComments(tex), labels: { name: string; index: number }[] = [], refs: { command: 'eqref' | 'ref'; label: string; index: number; source: string }[] = [];
+    for (const m of masked.matchAll(/\\label\s*\{([^{}]*)\}/g)) {
+        const name = (m[1] || '').trim().replace(/^\^/, '');
+        if (name)
+            labels.push({ name, index: m.index ?? 0 });
+    }
+    for (const m of masked.matchAll(/(?<![A-Za-z\\])\\(eq)?ref\s*\{([^{}]*)\}/g)) {
+        const label = (m[2] || '').trim();
+        if (label)
+            refs.push({ command: m[1] ? 'eqref' : 'ref', label, index: m.index ?? 0, source: m[0] });
+    }
+    return { labels, refs };
+}
+/** Top-level environments whose rows accept an explicit \tag. */
+const ROW_ENVIRONMENTS = new Set(['align', 'align*', 'gather', 'gather*', 'multline', 'multline*', 'eqnarray', 'eqnarray*', 'aligned', 'gathered', 'split']);
+const ROW_ENV_TARGET: Record<string, string> = { aligned: 'align', gathered: 'gather', split: 'align', align: 'align', gather: 'gather', equation: 'equation', multline: 'multline', eqnarray: 'eqnarray' };
+function rowEnvironment(tex: string) {
+    const masked = maskComments(tex);
+    const begin = masked.match(/^\s*\\begin\{([A-Za-z]+\*?)\}(?:\[[^\]]*\])?/), end = masked.match(/\\end\{([A-Za-z]+\*?)\}\s*$/);
+    if (!begin || !end || begin[1] !== end[1])
+        return null;
+    const bodyStart = begin[0].length;
+    return { name: begin[1], bodyStart, body: tex.slice(bodyStart, tex.length - end[0].length) };
+}
+/** Group top-level labels by the top-level row they sit on. */
+function rowGroups(body: string, labels: { name: string; index: number }[], bodyStart: number) {
+    const masked = maskComments(body), separators: {from:number; to:number}[] = [], topLabels = new Set<number>();
+    let depth = 0;
+    for (let i = 0; i < masked.length; i++) {
+        if (!depth) topLabels.add(i + bodyStart);
+        if (masked.startsWith('\\begin{', i)) { depth++; i += 6; }
+        else if (masked.startsWith('\\end{', i)) { depth = Math.max(0, depth - 1); i += 4; }
+        else if (!depth && masked.startsWith('\\\\', i)) {
+            const length = masked.slice(i).match(/^\\\\\*?(?:\[[^\]]*\])?/)![0].length;
+            separators.push({from:i,to:i+length}); i += length - 1;
+        }
+    }
+    const cuts = [0, ...separators.map(s => s.to)];
+    const rows: NonNullable<SourceRecord['rows']> = cuts.map((start, i) => {
+        const end = separators[i]?.from ?? body.length;
+        const content = masked.slice(start, end);
+        return { from: bodyStart + start, to: bodyStart + end,
+            labels: labels.filter(l => topLabels.has(l.index) && l.index >= bodyStart + start && l.index < bodyStart + end).map(l => l.name),
+            tag: content.match(/\\tag\*?\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/)?.[1],
+            suppress: /\\(?:notag|nonumber)\b/.test(content) || !content.replace(/\\label\s*\{[^{}]*\}/g, '').trim() };
+    });
+    const tags: Record<string, string> = Object.create(null) as Record<string, string>;
+    for (const row of rows) if (row.tag) for (const name of row.labels) tags[name] = row.tag;
+    return { rows, groups: rows.map(r => r.labels).filter(g => g.length), multi: cuts.length > 1, tags };
+}
+/** Transform only the actual outer delimiters, preserving comments and offsets. */
+function starRowEnvironment(tex: string) {
+    const masked = maskComments(tex);
+    const begin = masked.match(/^\s*\\begin\{([A-Za-z]+)(\*?)\}(?:\[[^\]]*\])?/), end = masked.match(/\\end\{([A-Za-z]+)(\*?)\}\s*$/);
+    if (!begin || !end || begin[1] !== end[1]) return tex;
+    const target = ROW_ENV_TARGET[begin[1]];
+    if (!target) return tex;
+    const start = masked.indexOf('\\begin');
+    const endLength = end[0].trimEnd().length;
+    return tex.slice(0, start) + '\\begin{' + target + '*}' + tex.slice(begin[0].length, end.index) + '\\end{' + target + '*}' + tex.slice(end.index! + endLength);
+}
+function encodeLabel(label: string) {
+    return Array.from(new TextEncoder().encode(label), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+function decodeLabel(value: string) {
+    if (!value || value.length % 2 || !/^[0-9a-f]+$/i.test(value))
+        return '';
+    const bytes = new Uint8Array(value.length / 2);
+    for (let i = 0; i < bytes.length; i++)
+        bytes[i] = parseInt(value.slice(i * 2, i * 2 + 2), 16);
+    return new TextDecoder().decode(bytes);
 }
 function resolvePath(name: string, here: string, paths: Set<string>, resolver?: (name: string, here: string) => string | null) {
     if (!name)
@@ -371,21 +540,36 @@ function assign(note: ParsedNote, settings: typeof DEFAULTS, referenced: Set<str
         r.scope = s.scope;
         r.number = '';
         r.subletter = '';
+        r.rowNumbers = undefined;
         r.referenced = r.ids.some(id => referenced.has(note.path + '#^' + id));
-        if (r.manual) {
+        for (const manual of r.rows ? r.rows.map(row => row.tag).filter((tag): tag is string => !!tag) : r.manual ? [r.manual] : []) {
             const k = bucket(r);
             if (!reserved.has(k))
                 reserved.set(k, new Set());
-            reserved.get(k)!.add(r.manual);
+            reserved.get(k)!.add(manual);
         }
     }
     for (const r of note.records) {
         if (r.kind === 'subfigure')
             continue;
-        if (r.manual) {
-            r.number = r.manual;
+        if (r.rows) {
+            const k = bucket(r), taken = reserved.get(k) || new Set<string>();
+            const numbers: Record<string, string> = Object.create(null) as Record<string, string>;
+            let n = counters.get(k) || 0;
+            for (const row of r.rows) {
+                row.number = row.tag || '';
+                const requested = settings.equationMode === 'all' || settings.equationMode === 'referenced' && row.labels.some(id => referenced.has(note.path + '#^' + id));
+                if (!row.number && requested && !row.suppress) {
+                    do { n++; row.number = (r.prefix ? r.prefix + '.' : '') + n; } while (taken.has(row.number));
+                }
+                for (const name of row.labels) numbers[name] = row.number;
+                if (!r.number && row.number) r.number = row.number;
+            }
+            r.rowNumbers = Object.fromEntries(Object.entries(numbers));
+            counters.set(k, n);
             continue;
         }
+        if (r.manual) { r.number = r.manual; continue; }
         const should = r.kind === 'algorithm' ? settings.algorithmNumbered : r.kind === 'equation' ? (settings.equationMode === 'all' || settings.equationMode === 'referenced' && r.referenced) : r.kind === 'theorem' ? settings.numbered && (r.environment ? r.environment.numbered : !['proof', 'remark', 'solution'].includes(r.key)) : settings.mediaNumbered;
         if (!should || r.suppress || r.multiTag)
             continue;
@@ -434,6 +618,8 @@ function graph(notes: ParsedNote[], opts: Partial<typeof DEFAULTS> = {}, resolve
     for (const n of notes)
         assign(n, settings, referenced, chapters?.get(n.path));
     return { notes: map, settings, warnings, referenced, resolve(raw: string, here: string) { const t = splitTarget(raw); if (!t)
+            return null; const p = resolvePath(t.file, here, paths, resolver); return p ? map.get(p)!.blocks.get(t.block) || null : null; },
+        resolveLabel(raw: string, here: string) { const t = labelTarget(raw); if (!t)
             return null; const p = resolvePath(t.file, here, paths, resolver); return p ? map.get(p)!.blocks.get(t.block) || null : null; } };
 }
 /** Move exclusive legacy defaults into the single per-environment editor. */
@@ -459,25 +645,47 @@ function referenceFormat(key: string, opts: Partial<typeof DEFAULTS> = {}, kind 
     }
     return format;
 }
-function refText(r: SourceRecord | null | undefined, settings = DEFAULTS) {
+function referenceNumber(r: SourceRecord, label?: string) {
+    return label && r.rowGroups?.some(group => group.includes(label)) ? r.rowTags?.[label] ?? r.rowNumbers?.[label] ?? '' : r.number;
+}
+function refText(r: SourceRecord | null | undefined, settings = DEFAULTS, label?: string) {
     if (!r)
         return null;
     settings = { ...DEFAULTS, ...settings };
     const override = referenceOverrides(settings)[r.key] || {};
     const name = override.name || typeNames(r.key, settings)[0];
     const abbr = override.abbr || r.environment?.abbr || ABBR[r.key] || r.key, type = settings.shortReferences ? abbr : name;
-    if (!r.number)
+    // A row label must use its own tag/number, never the first row's fallback.
+    const number = referenceNumber(r, label);
+    if (!number)
         return `${type}${r.title ? ' · ' + plain(r.title) : t("（未编号）")}`;
     const format = referenceFormat(r.key, settings, r.kind);
-    return String(format).replace(/\{(number|type|name|abbr|title|file)\}/g, (_, k: 'number' | 'type' | 'name' | 'abbr' | 'title' | 'file') => ({ number: r.number, type, name, abbr, title: plain(r.title), file: r.path.replace(/\.md$/i, '').split('/').pop() || '' })[k]);
+    return String(format).replace(/\{(number|type|name|abbr|title|file)\}/g, (_, k: 'number' | 'type' | 'name' | 'abbr' | 'title' | 'file') => ({ number, type, name, abbr, title: plain(r.title), file: r.path.replace(/\.md$/i, '').split('/').pop() || '' })[k]);
 }
-function taggedTex(eq: SourceRecord) {
-    if (eq.manual || eq.multiTag)
-        return eq.tex || '';
-    // One native block = one identifier/number. No implicit AMS row counters.
-    let tex = (eq.tex || '').replace(/^\s*\\begin\{(equation\*?|align\*?|gather\*?)\}([\s\S]*)\\end\{\1\}\s*$/, (_, env: string, body: string) => env.startsWith('align') ? '\\begin{aligned}' + body + '\\end{aligned}' : env.startsWith('gather') ? '\\begin{gathered}' + body + '\\end{gathered}' : body);
-    if (eq.number)
-        tex += '\\tag{' + eq.number + '}';
+function taggedTex(eq: SourceRecord, resolve?: (label: string) => SourceRecord | null, links = false) {
+    let tex = eq.tex || '';
+    const masked = maskComments(tex), edits: { from: number; to: number; text: string }[] = [];
+    for (const m of masked.matchAll(/\\label\s*\{([^{}]*)\}/g)) edits.push({ from: m.index, to: m.index + m[0].length, text: '' });
+    if (eq.rows) for (const row of eq.rows) {
+        if (row.number && !row.tag) {
+            const labelOffset = masked.slice(row.from, row.to).search(/\\label\s*\{/);
+            const at = row.from + Math.max(0, labelOffset);
+            edits.push({ from: at, to: at, text: '\\tag{' + row.number + '}' });
+        }
+    }
+    if (resolve) for (const m of masked.matchAll(/(?<![A-Za-z\\])\\(eq)?ref\s*\{([^{}]*)\}/g)) {
+        const key = m[2].trim(), target = resolve(key), name = labelTarget(key)?.block || key.replace(/^\^/, '');
+        const raw = target ? referenceNumber(target, name) : '';
+        const number = raw.replace(/[\\{}%#&$]/g, ch => '\\' + ch);
+        const shown = '\\text{' + (raw ? (m[1] ? '(' + number + ')' : number) : target ? t('未编号') : '??') + '}';
+        edits.push({ from: m.index, to: m.index + m[0].length, text: links && target ? '\\href{an-eqref:' + encodeLabel(key) + '}{' + shown + '}' : shown });
+    }
+    for (const edit of edits.sort((a,b) => b.from - a.from || b.to - a.to)) tex = tex.slice(0, edit.from) + edit.text + tex.slice(edit.to);
+    if (eq.rows) return starRowEnvironment(tex);
+    if (!eq.manual && !eq.multiTag) {
+        tex = tex.replace(/^\s*\\begin\{(equation\*?|align\*?|gather\*?)\}([\s\S]*)\\end\{\1\}\s*$/, (_, env: string, body: string) => env.startsWith('align') ? '\\begin{aligned}' + body + '\\end{aligned}' : env.startsWith('gather') ? '\\begin{gathered}' + body + '\\end{gathered}' : body);
+        if (eq.number) tex += '\n\\tag{' + eq.number + '}';
+    }
     return tex;
 }
 function typeNames(key: string, opts: Partial<typeof DEFAULTS> = {}) {
@@ -492,4 +700,4 @@ function labelName(key: string, opts: Partial<typeof DEFAULTS> = {}) {
 }
 const validCustomKey = (key: string) => validEnvironmentKey(key, reservedEnvironmentKeys);
 const APPEARANCE_TYPES: Record<string, string[]> = { ...TYPES, algorithm: MEDIA.algorithm };
-export default { migrateReferenceFormats, referenceFormat, environments, referenceOverrides, typeNames, labelName, validCustomKey, TYPES, APPEARANCE_TYPES, MEDIA, ABBR, mediaCanon, canon, DEFAULTS, maskedSource, parse, graph, refText, taggedTex, splitTarget, resolvePath, cleanPath, lineOf, quote, plain };
+export default { migrateReferenceFormats, referenceFormat, environments, referenceOverrides, typeNames, labelName, validCustomKey, TYPES, APPEARANCE_TYPES, MEDIA, ABBR, mediaCanon, canon, DEFAULTS, maskedSource, parse, graph, refText, referenceNumber, taggedTex, splitTarget, labelTarget, encodeLabel, decodeLabel, resolvePath, cleanPath, lineOf, quote, plain };

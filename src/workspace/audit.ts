@@ -1,7 +1,7 @@
 import Engine, { type NoteGraph, type ParsedNote } from '../indexing/engine';
 import { t } from '../i18n';
 
-export type AuditCode = 'duplicate-id' | 'missing-file' | 'ambiguous-file' | 'excluded-file' | 'missing-block' | 'ambiguous-block' | 'outside-book' | 'number-conflict';
+export type AuditCode = 'duplicate-id' | 'missing-file' | 'ambiguous-file' | 'excluded-file' | 'missing-block' | 'ambiguous-block' | 'outside-book' | 'number-conflict' | 'unnumbered-target';
 export interface AuditIssue { code: AuditCode; path: string; line: number; detail: string; related?: { path: string; line: number } }
 export interface AuditOptions {
     paths?: Set<string>;
@@ -19,7 +19,7 @@ export function auditReferences(graph: NoteGraph, options: AuditOptions = {}): A
         for (const [id, lines] of anchors.get(path)!) if (lines.length > 1)
             issues.push({ code: 'duplicate-id', path, line: lines[1], detail: '^' + id, related: { path, line: lines[0] } });
         const numbers = new Map<string, typeof note.records[number]>();
-        for (const record of note.records) {
+        for (const record of note.records.flatMap(r => r.rows ? r.rows.filter(row => row.number).map(row => ({ ...r, number: row.number!, manual: row.tag || null })) : [r])) {
             if (!record.number) continue;
             const bucket = record.kind === 'theorem' ? graph.settings.sharedCounter ? 'theorem' : record.key : record.kind === 'subfigure' ? `subfigure:${record.parent?.from}` : record.kind;
             const key = `${record.scope}|${bucket}|${record.number}`, previous = numbers.get(key);
@@ -42,6 +42,8 @@ export function auditReferences(graph: NoteGraph, options: AuditOptions = {}): A
             if ((hits?.length || 0) > 1 || target.blocks.has(ref.block) && target.blocks.get(ref.block) === null) { add('ambiguous-block'); continue; }
             const exists = hits?.length || target.blocks.get(ref.block) || options.externalBlock?.(targetPath, ref.block);
             if (!exists) { add('missing-block'); continue; }
+            const record = target.blocks.get(ref.block);
+            if (record?.kind === 'equation' && !Engine.referenceNumber(record, ref.block)) add('unnumbered-target');
             if (options.book && !selected.has(targetPath)) add('outside-book');
         }
     }
@@ -56,6 +58,7 @@ export function auditLabel(code: AuditCode) {
         case 'missing-block': return t('目标块标签不存在');
         case 'ambiguous-block': return t('目标块标签重复');
         case 'outside-book': return t('引用目标未选入合订本');
+        case 'unnumbered-target': return t('引用的公式未编号');
         case 'number-conflict': return t('手动编号与同组编号冲突');
     }
 }

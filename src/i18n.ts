@@ -1,6 +1,8 @@
 // Application language is set from Obsidian's public getLanguage() API on load.
 // Keep this module independent of Obsidian so isolated PDF code can receive text.
 export const ENGLISH = {
+  "未编号": "unnumbered",
+  "引用的公式未编号": "Referenced equation is unnumbered",
   "清单不能包含自身作为章节。": "A manifest cannot include itself as a chapter.",
   "副标题": "Subtitle",
   "目录深度": "Contents depth",
@@ -335,6 +337,7 @@ export const ENGLISH = {
   "刷新阅读片段": "Refresh reading view",
   "刷新编辑器": "Refresh editor",
   "打开块引用": "Open block reference",
+  "打开公式引用": "Open equation reference",
   "目录渲染": "Render table of contents",
   "请把光标放到 $$ 公式块或定理、figure、subfigure、table callout 内。": "Place the cursor inside a $$ equation or a theorem, figure, subfigure or table callout.",
   "该块已有 ID：^": "This block already has an ID: ^",
@@ -446,6 +449,7 @@ export const ENGLISH = {
   "{0}:{1} 含多个手写 tag，保留公式但不猜测整块引用编号。": "{0}:{1} Multiple explicit tags: preserve the equation without inferring a single reference number.",
   "{0}: 存在未闭合的 $$，最后一段不参与编号。": "{0}: Unclosed $$; the final block is not numbered.",
   "{0}: 重复块 ID ^{1}，不解析歧义引用。": "{0}: Duplicate block ID ^{1}; ambiguous references are not resolved.",
+  "{0}: 块 ID ^{1} 与同名 \\label 指向不同目标，不解析歧义引用。": "{0}: Block ID ^{1} and a \\label with the same name refer to different targets; ambiguous references are not resolved.",
   "{0}:{1} subfigure 不在 figure 内，仅显示题注，不猜测主图编号。": "{0}:{1} Subfigure outside a figure: show its caption without inferring a parent figure number.",
   "（未编号）": " (unnumbered)",
   "当前 Obsidian 未提供 Electron PDF 接口，请更新桌面安装程序。": "Obsidian's Electron PDF interface is unavailable. Update the desktop installer.",

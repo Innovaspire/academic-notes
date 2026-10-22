@@ -58,7 +58,7 @@ export function catalogBody(graph: NoteGraph, options: CatalogOptions, paths: Se
         const note = graph.notes.get(path); if (!note) continue;
         for (const record of note.records) {
             if (!options.types.includes(record.key) || !options.unnumbered && !record.number) continue;
-            const id = record.ids.find(id => note.blocks.get(id) === record && (note.anchors?.get(id)?.length || 0) < 2);
+            const id = record.ids.find(id => note.blocks.get(id) === record && note.anchors?.get(id)?.length === 1);
             const heading = [...note.headings].reverse().find(h => h.line < record.line);
             const name = `${Engine.labelName(record.key, graph.settings)}${record.number ? ' ' + record.number : ''}`;
             const title = record.title ? ' — ' + label(Engine.plain(record.title)) : '';

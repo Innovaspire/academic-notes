@@ -51,6 +51,8 @@ Optional paragraph indentation and Knuth–Plass line breaking **(Beta)** refine
 
 [Contents and export](https://github.com/Kristal-Boltinn/academic-notes/wiki/Contents-and-export)
 
+Display equations support LaTeX labels and cross-file references, with optional per-row numbering and export links. See the [equation reference guide](https://github.com/Kristal-Boltinn/academic-notes/wiki/LaTeX-equation-references).
+
 ## Desktop and mobile
 
 Requires **Obsidian 1.9.0 or later**. Mathematical environments, numbering, references, indexes, appearance tools, and HTML snapshots work on desktop and mobile. **PDF export is desktop-only**, using Obsidian's bundled Electron; no separate export engine is required. The interface follows Obsidian's language, with English and Simplified Chinese available.
@@ -70,6 +72,10 @@ Installation, syntax, settings, and examples live in the **[Wiki](https://github
 ## License
 
 [MIT](LICENSE). Dependency licenses and acknowledgments are in [Third-party notices](THIRD-PARTY-NOTICES.md).
+
+## Contributors
+
+Thanks to [Innovaspire](https://github.com/Innovaspire) for contributing LaTeX equation references and per-row numbering in [PR #2](https://github.com/Kristal-Boltinn/academic-notes/pull/2).
 
 ## Support and feedback
 
