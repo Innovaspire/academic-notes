@@ -9,7 +9,7 @@ import { traceLayout } from '../diagnostics/layout';
 import * as Obs from 'obsidian';
 import Engine from '../indexing/engine';
 import type AcademicNotes from '../main';
-import type { ParsedNote, SourceRecord, SourceReference, NoteGraph } from '../indexing/engine';
+import type { ParsedNote, SourceRecord, InlineMath, SourceReference, NoteGraph } from '../indexing/engine';
 import { ViewPlugin, Decoration, WidgetType, type EditorView, type ViewUpdate, type DecorationSet } from '@codemirror/view';
 import { StateEffect, type Range } from '@codemirror/state';
 type SectionInfo = { lineStart: number; lineEnd: number };
@@ -119,20 +119,22 @@ function mediaRecord(box: HTMLElement, r: SourceRecord | null | undefined, setti
                 setClass(child, 'an-empty-anchor');
     }
 }
-function mathRecord(mjx: HTMLElement, r: SourceRecord | null | undefined, note: ParsedNote, graph: NoteGraph) {
+function mathRecord(mjx: HTMLElement, r: SourceRecord | InlineMath | null | undefined, note: ParsedNote, graph: NoteGraph) {
     if (!r || editableLiveNode(mjx))
         return false;
-    const tex = Engine.taggedTex(r, label => graph.resolveLabel(label, note.path), true);
-    const signature = JSON.stringify([tex, r.number]);
+    const display = 'kind' in r;
+    const tex = display ? Engine.taggedTex(r, label => graph.resolveLabel(label, note.path), true) : Engine.referenceTex(r.tex, label => graph.resolveLabel(label,note.path),true);
+    if (!display && tex === r.tex && !mjx.dataset.anMath) return false;
+    const signature = JSON.stringify([tex, display ? r.number : '']);
     if (mjx.dataset.anMath === signature)
         return false;
     mjx.dataset.anMath = signature;
     mjx.dataset.anLine = String(r.line);
     mjx.dataset.anPath = note.path;
     // Native rendering owns explicit tags unless \label/\eqref changed the source.
-    if ((r.manual || r.multiTag) && tex === (r.tex || ''))
+    if (display && (r.manual || r.multiTag) && tex === (r.tex || ''))
         return false;
-    const rendered = Obs.renderMath(tex, true);
+    const rendered = Obs.renderMath(tex, display);
     // Retain the host element, native events, source mapping, and its outer layout wrapper.
     mjx.replaceChildren(...rendered.childNodes);
     for (const a of mjx.querySelectorAll<HTMLAnchorElement>('a')) {
@@ -153,14 +155,14 @@ function mathRecord(mjx: HTMLElement, r: SourceRecord | null | undefined, note: 
         else
             mjx.removeAttribute(key);
     }
-    mjx.classList.add('an-numbered-math');
+    mjx.classList.add(display ? 'an-numbered-math' : 'an-inline-reference');
     return true;
 }
 function renderFragment(el: HTMLElement, note: ParsedNote | undefined, graph: NoteGraph | null, infoFor: (node: HTMLElement) => SectionInfo | null) {
     if (!note || !graph)
         return;
     const used = new Set();
-    const pick = (node: HTMLElement, records: SourceRecord[]) => {
+    const pick = <T extends SourceRecord | InlineMath>(node: HTMLElement, records: T[]): T | null => {
         const info = infoFor(node);
         if (!info || !Number.isInteger(info.lineStart))
             return null;
@@ -206,6 +208,12 @@ function renderFragment(el: HTMLElement, note: ParsedNote | undefined, graph: No
         if (r)
             mathChanged = mathRecord(mjx, r, note, graph) || mathChanged;
     }
+    used.clear();
+    for (const mjx of allNodes(el, 'mjx-container:not([display="true"])')) {
+        if (mjx.closest('.an-algorithm,.an-diagram-block,.an-reference-preview')) continue;
+        const r = pick(mjx, note.inlineMath || []);
+        if (r) mathChanged = mathRecord(mjx,r,note,graph) || mathChanged;
+    }
     markMathContinuations(el, note, infoFor);
     if (mathChanged)
         Promise.resolve(Obs.finishRenderMath()).catch(console.error);
@@ -225,6 +233,8 @@ function renderFragment(el: HTMLElement, note: ParsedNote | undefined, graph: No
         // Unknown provenance or an explicit alias must not be silently overwritten.
         if (!ref)
             continue;
+        setAttribute(a, 'data-an-source', note.path);
+        setAttribute(a, 'data-an-target', ref.raw);
         if (graph.settings.respectAliases && ref.alias !== null)
             continue;
         const text = Engine.refText(r, graph.settings, ref.block);
@@ -247,6 +257,7 @@ function createLiveExtension(plugin: AcademicNotes) {
             a.className = 'internal-link an-ref';
             a.textContent = this.label;
             a.dataset.href = this.raw;
+            a.dataset.anSource = this.path; a.dataset.anTarget = this.raw;
             a.href = this.raw;
             a.tabIndex = 0;
             a.setAttribute('aria-label', this.label + ' — ' + this.raw);

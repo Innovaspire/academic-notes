@@ -22,3 +22,7 @@ Obsidian provides its own API and native math renderer; Obsidian is not redistri
 Browser regressions also use MathJax 3.2.2 to exercise both SVG and CommonHTML host output. The bundled fallback uses the base, AMS, newcommand and configmacros packages; test-only packages and the CommonHTML renderer are excluded from the installed plugin. The optional TikZ integration delegates rendering to the user's installed TikZJax plugin; no TikZJax code is bundled.
 
 Examples and test drawings in this repository are synthetic and distributed under this project's MIT license. User notes, local settings, fonts and exported documents remain outside the software license.
+
+## YAML
+
+YAML (MIT), by Eemeli Aro and contributors, is bundled to update book manifests while preserving YAML comments. License: [licenses/yaml.txt](licenses/yaml.txt).

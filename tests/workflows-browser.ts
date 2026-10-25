@@ -1,3 +1,4 @@
+import { RenameReferenceModal } from '../src/ui/rename-reference';
 import { MarkdownView, TFile } from 'obsidian';
 import AcademicNotes from '../src/main';
 import Engine from '../src/indexing/engine';
@@ -47,6 +48,18 @@ export async function runWorkflowRegressions() {
     check(rowTarget,'Second row must appear as a selectable reference target');
     await plugin.insertReference(editor,b,rowTarget,editor.getCursor(),editor.getCursor(),'eqref','second');
     check(buffer==='$$'+String.raw`\eqref{Math#^second}`,'Safe insertion must retain selected row and math syntax');
+    view.file=a;active=a;buffer=texts.get(a.path)!;
+    view.file=b;active=b;buffer=String.raw`By $\eqref{Math#^second}$.`;await plugin.rebuild();
+    const rename = new RenameReferenceModal(plugin,math.path,'second');rename.open();
+    const renameInput=rename.contentEl.querySelector<HTMLInputElement>('input')!;
+    renameInput.value='renamed';renameInput.dispatchEvent(new Event('change'));
+    const renameButton=(name:string)=>[...rename.contentEl.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent===name)!;
+    renameButton('Preview changes').click();await wait();
+    check(!renameButton('Apply changes').disabled && rename.contentEl.textContent.includes('B.md'),'Rename preview must include the unsaved referencing note');
+    renameButton('Apply changes').click();await wait();
+    check(buffer.includes('Math#^renamed') && texts.get(math.path)!.includes(String.raw`\label{renamed}`),'Apply must update the target and unsaved references');
+    renameButton('Undo rename').click();await wait();
+    check(buffer.includes('Math#^second') && texts.get(math.path)!.includes(String.raw`\label{second}`),'Undo must restore the same reviewed changes');
     view.file=a;active=a;buffer=texts.get(a.path)!;
     // Save then reopen a manifest, retaining user properties and handwritten prose.
     const book:any=new BookPicker(plugin);book.open();book.selected=[a,b];book.title='Study: notes';book.titles.set(a.path,'Chapter A');book.destination='Collection.md';

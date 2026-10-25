@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 import { typographyClient } from './typography-client.mjs';
 
 // Isolated synthetic host: no connection to a real vault or an existing browser.
-const imports = {runUiRegressions:'browser-regression',runLatexExportRegression:'latex-browser',runWorkflowRegressions:'workflows-browser',runFeatureRegressions:'feature-browser',runEditorIdleRegressions:'editor-idle-browser',runKpLiveRegressions:'kp-live-browser'};
+const imports = {runUiRegressions:'browser-regression',runReferenceWorkflowRegressions:'reference-browser',runLatexExportRegression:'latex-browser',runWorkflowRegressions:'workflows-browser',runFeatureRegressions:'feature-browser',runEditorIdleRegressions:'editor-idle-browser',runKpLiveRegressions:'kp-live-browser'};
 const client = (await build({stdin:{contents:Object.entries(imports).map(([fn,file])=>`import {${fn}} from './tests/${file}'; globalThis.${fn}=${fn};`).join('\n'),resolveDir:process.cwd()},bundle:true,write:false,format:'iife',platform:'browser',plugins:[typographyClient],loader:{'.css':'text'},external:['electron','@electron/remote'],alias:{obsidian:resolve('tests/browser-host.ts')}})).outputFiles[0].text;
 const css = await readFile('styles.css','utf8');
 const browser = await webkit.launch({headless:true});
@@ -24,6 +24,8 @@ try {
       if(errors.length)throw new Error(errors.join('\n'));
       await page.evaluate(()=>{document.body.innerHTML=globalThis.academicWorkflowPreview;});
       await page.screenshot({path:`output/playwright/webkit-${viewport.width}-arrows.png`,fullPage:true});
+      await page.evaluate(()=>{document.body.innerHTML=globalThis.academicReferencePreview;document.querySelector('.an-reference-popover').style.cssText='position:relative;left:0;top:0;width:440px;max-width:100%;margin:32px auto';});
+      await page.screenshot({path:`output/playwright/reference-preview-${viewport.width}.png`,fullPage:true});
     } catch(error) { await page.screenshot({path:`output/playwright/webkit-${viewport.width}-failure.png`,fullPage:true});throw error; }
     finally {await context.close();}
   }

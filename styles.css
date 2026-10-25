@@ -1271,6 +1271,56 @@ body .markdown-source-view.mod-cm6 .callout:is([data-callout=figure], [data-call
   color: var(--text-muted);
   font-size: var(--font-ui-small);
 }
+.an-reference-popover {
+  position: fixed;
+  z-index: var(--layer-popover, 1000);
+  width: min(440px, calc(100vw - 24px));
+  max-height: min(520px, 70vh);
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m, 8px);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  box-shadow: var(--shadow-l);
+}
+.an-reference-preview h3 {
+  margin: 0 0 8px;
+}
+.an-reference-location {
+  font-size: var(--font-ui-small);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+.an-reference-excerpt {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 32vh;
+  overflow: auto;
+  margin-block: 12px;
+}
+.an-reference-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block: 12px;
+}
+.an-reference-incoming {
+  display: block;
+  margin-block: 6px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  height: auto;
+  text-align: start;
+}
+.an-refactor-results {
+  max-height: 50vh;
+  overflow: auto;
+}
+.an-refactor-results pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 
 .an-diagram-modal {
   width: min(850px, 96vw);

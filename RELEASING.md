@@ -16,3 +16,17 @@ References verified 2026-09-20:
 - [Manifest requirements](https://docs.obsidian.md/Reference/Manifest)
 
 This repository's automation does not create a repository, publish a public release or submit to the Community Directory by itself.
+
+## Develop outside the vault
+
+Keep this Git checkout, dependencies and output outside any daily-note vault. After `npm ci`, build and install into a test vault with:
+
+```sh
+npm run deploy -- --vault "path/to/test-vault"
+```
+
+The vault must already contain `.obsidian/` (or use `--config-dir .obsidian-dev`). Only `main.js`, `manifest.json` and `styles.css` go into `.obsidian/plugins/academic-notes/`. Settings, notes and other plugins are preserved. Previous assets are backed up under this checkout's `output/deploy-backups/`; a failed file write rolls back the completed writes.
+
+The command reloads the plugin with Obsidian CLI from the target vault directory. Obsidian must be running with that vault open and CLI enabled; a newly installed plugin may need enabling first. Set `--obsidian "path/to/Obsidian.com"` or `OBSIDIAN_CLI` if the CLI is not found. `--no-reload` installs without invoking the CLI; a reload failure leaves the new assets installed and reports this explicitly. See [official CLI setup](https://help.obsidian.md/cli).
+
+Set `ACADEMIC_NOTES_VAULT` locally to avoid repeating `--vault`. Use `--skip-build` only to deploy assets that have already been built. The development script uses Node filesystem/process APIs; it is not part of the installed plugin and is not bundled in `main.js`.

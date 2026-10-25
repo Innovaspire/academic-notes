@@ -199,6 +199,14 @@
 
 # Changelog
 
+## Unreleased
+
+- Add a build/deploy command that installs only the three plugin assets, backs up previous assets outside the vault and optionally reloads the target vault through Obsidian CLI.
+- Maintain LaTeX references and book chapter paths after note/folder renames; preview and apply label renames across definitions, wikilinks, Markdown links and math references, with stale-edit protection and undo.
+- Resolve inline LaTeX references in Reading view, inactive Live Preview and HTML/PDF exports.
+- Preview references on desktop hover/focus and mobile tap, with target navigation and incoming reference locations.
+
+
 ## 2.15.4
 
 - Integrate Innovaspire's LaTeX equation references and row-numbering contribution (#2), retaining the original commits.

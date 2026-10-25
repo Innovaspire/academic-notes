@@ -1,3 +1,4 @@
+import { scanMath, type MathSpan } from './math';
 import { readEnvironments, readReferenceOverrides, validEnvironmentKey, type CustomEnvironment } from './environments';
 import { algorithmBlocks, parseAlgorithm, type AlgorithmData } from '../algorithms/model';
 import { t } from '../i18n';
@@ -57,7 +58,9 @@ export interface SourceReference {
     targetPath?: string | null;
     target?: SourceRecord | null;
 }
+export interface InlineMath { from: number; to: number; line: number; endLine: number; tex: string }
 export interface ParsedNote {
+    inlineMath: InlineMath[];
     path: string;
     source: string;
     lines: string[];
@@ -154,6 +157,28 @@ function maskedSource(source: string) {
     }).join('\n');
     return masked;
 }
+function mathSpans(source: string, includeUnclosed = false) {
+    let mask = maskedSource(source);
+    if (includeUnclosed) {
+        const start = mask.lastIndexOf('\n') + 1, tick = mask.slice(start).match(/(?<!\\)`+/);
+        if (tick) mask = mask.slice(0,start+tick.index!) + ' '.repeat(mask.length-start-tick.index!);
+    }
+    return scanMath(mask, includeUnclosed);
+}
+/** Preserve the original offsets when quoted display math loses Markdown quote prefixes. */
+function mathText(source: string, span: MathSpan, depth: number) {
+    let text = '', offset = span.contentFrom;
+    const offsets: number[] = [], lines = source.slice(span.contentFrom, span.contentTo).split('\n');
+    for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+        const line = lines[lineIndex]; let skip = 0;
+        if (lineIndex) for (let d = 0; d < depth; d++) { const prefix = line.slice(skip).match(/^[ \t]*>[ \t]?/); if (prefix) skip += prefix[0].length; }
+        for (let i = skip; i < line.length; i++) { text += line[i]; offsets.push(offset + i); }
+        offset += line.length;
+        if (lineIndex < lines.length - 1) { text += '\n'; offsets.push(offset++); }
+    }
+    const start = text.length - text.trimStart().length, tex = text.trim();
+    return { tex, offsets: offsets.slice(start, start + tex.length) };
+}
 function parse(path: string, source: string, cache: {
     blocks?: Record<string, { position: { start: { line: number }; end: { line: number } } }>;
 } = {}, opts: Partial<typeof DEFAULTS> = {}): ParsedNote {
@@ -180,14 +205,11 @@ function parse(path: string, source: string, cache: {
         } catch (error) { rec.suppress = true; rec.manual = null; rec.algorithmError = String(error instanceof Error ? error.message : error); warnings.push(`${path}:${block.line + 1}: ${rec.algorithmError}`); }
         records.push(rec); media.push(rec); if (block.callout) callouts.push(rec);
     }
-    // All $$ pairs, including display expressions embedded in a quoted paragraph.
-    const delimiters = [...mask.matchAll(/(?<!\\)\$\$/g)];
-    for (let i = 0; i + 1 < delimiters.length; i += 2) {
-        const from = delimiters[i].index, close = delimiters[i + 1].index, to = close + 2;
+    const spans = scanMath(mask, true), inlineMath: InlineMath[] = [];
+    for (const span of spans.filter(span => span.closed && span.display)) {
+        const from = span.from, to = span.to;
         const line = lineOf(starts, from), endLine = lineOf(starts, to - 1), depth = quote(lines[line]).depth;
-        const tex = source.slice(from + 2, close).split('\n').map((l, i) => { if (!i || !depth)
-            return l; for (let d = 0; d < depth; d++)
-            l = l.replace(/^[ \t]*>[ \t]?/, ''); return l; }).join('\n').trim();
+        const { tex, offsets } = mathText(source, span, depth);
         const maskedTex = maskComments(tex);
         const tags = [...maskedTex.matchAll(/\\tag(\*)?\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g)];
         const rec: SourceRecord = { kind: 'equation', key: 'equation', path, line, endLine, from, to, depth: quote(lines[line]).depth,
@@ -209,24 +231,30 @@ function parse(path: string, source: string, cache: {
         }
         if (rec.multiTag && !rec.rows)
             warnings.push(t("{0}:{1} 含多个手写 tag，保留公式但不猜测整块引用编号。", path, line + 1));
-        const content = source.slice(from + 2, close), lead = content.length - content.trimStart().length;
-        const leadLines = (content.slice(0, lead).match(/\n/g) || []).length;
         for (const ref of latex.refs) {
             const target = labelTarget(ref.label);
-            if (!target)
-                continue;
-            const at = from + 2 + lead + ref.index, refLine = line + leadLines + (tex.slice(0, ref.index).match(/\n/g) || []).length;
+            if (!target) continue;
+            const at = offsets[ref.index], end = offsets[ref.index + ref.source.length - 1] + 1;
             latexReferences.push({ file: target.file, block: target.block, raw: ref.source, alias: null, embed: false,
-                from: at, to: at + ref.source.length, line: refLine, syntax: 'latex', command: ref.command, label: ref.label });
+                from: at, to: end, line: lineOf(starts, at), syntax: 'latex', command: ref.command, label: ref.label });
         }
         equations.push(rec);
         records.push(rec);
     }
-    if (delimiters.length % 2)
+    if (spans.some(span => span.display && !span.closed))
         warnings.push(t("{0}: 存在未闭合的 $$，最后一段不参与编号。", path));
+    for (const span of spans.filter(span => span.closed && !span.display)) {
+        const tex = source.slice(span.contentFrom, span.contentTo);
+        inlineMath.push({from:span.from,to:span.to,line:lineOf(starts,span.from),endLine:lineOf(starts,span.to-1),tex});
+        for (const ref of latexCommands(tex).refs) {
+            const target = labelTarget(ref.label); if (!target) continue;
+            const at = span.contentFrom + ref.index;
+            latexReferences.push({...target,raw:ref.source,alias:null,embed:false,from:at,to:at+ref.source.length,line:lineOf(starts,at),syntax:'latex',command:ref.command,label:ref.label});
+        }
+    }
     // Math contents cannot declare headings, callouts, block IDs or links.
     const chars = mask.split('');
-    for (const e of equations)
+    for (const e of [...equations, ...inlineMath])
         for (let i = e.from; i < e.to; i++)
             if (chars[i] !== '\n' && chars[i] !== '\r')
                 chars[i] = ' ';
@@ -379,7 +407,7 @@ function parse(path: string, source: string, cache: {
             warnings.push(t("{0}:{1} subfigure 不在 figure 内，仅显示题注，不猜测主图编号。", path, r.line + 1));
     }
     for (const [id, locations] of anchors) if (locations.length > 1 && blocks.has(id)) blocks.set(id, null);
-    return { _environments: opts.customEnvironments || '{}', path, source, lines, starts, records, theorems, equations, media, callouts, blocks, anchors, refs, headings, warnings };
+    return { _environments: opts.customEnvironments || '{}', path, source, lines, starts, records, theorems, equations, inlineMath, media, callouts, blocks, anchors, refs, headings, warnings };
 }
 function splitTarget(raw: string) {
     raw = decode(raw);
@@ -662,6 +690,18 @@ function refText(r: SourceRecord | null | undefined, settings = DEFAULTS, label?
     const format = referenceFormat(r.key, settings, r.kind);
     return String(format).replace(/\{(number|type|name|abbr|title|file)\}/g, (_, k: 'number' | 'type' | 'name' | 'abbr' | 'title' | 'file') => ({ number, type, name, abbr, title: plain(r.title), file: r.path.replace(/\.md$/i, '').split('/').pop() || '' })[k]);
 }
+function referenceTex(tex: string, resolve: (label: string) => SourceRecord | null, links = false) {
+    const masked = maskComments(tex), edits: {from:number;to:number;text:string}[] = [];
+    for (const m of masked.matchAll(/(?<![A-Za-z\\])\\(eq)?ref\s*\{([^{}]*)\}/g)) {
+        const key = m[2].trim(), target = resolve(key), name = labelTarget(key)?.block || key.replace(/^\^/, '');
+        const raw = target ? referenceNumber(target, name) : '';
+        const number = raw.replace(/[\\{}%#&$]/g, ch => '\\' + ch);
+        const shown = '\\text{' + (raw ? (m[1] ? '(' + number + ')' : number) : target ? t('未编号') : '??') + '}';
+        edits.push({ from: m.index, to: m.index + m[0].length, text: links && target ? '\\href{an-eqref:' + encodeLabel(key) + '}{' + shown + '}' : shown });
+    }
+    for (const edit of edits.sort((a,b) => b.from - a.from)) tex = tex.slice(0,edit.from) + edit.text + tex.slice(edit.to);
+    return tex;
+}
 function taggedTex(eq: SourceRecord, resolve?: (label: string) => SourceRecord | null, links = false) {
     let tex = eq.tex || '';
     const masked = maskComments(tex), edits: { from: number; to: number; text: string }[] = [];
@@ -673,14 +713,8 @@ function taggedTex(eq: SourceRecord, resolve?: (label: string) => SourceRecord |
             edits.push({ from: at, to: at, text: '\\tag{' + row.number + '}' });
         }
     }
-    if (resolve) for (const m of masked.matchAll(/(?<![A-Za-z\\])\\(eq)?ref\s*\{([^{}]*)\}/g)) {
-        const key = m[2].trim(), target = resolve(key), name = labelTarget(key)?.block || key.replace(/^\^/, '');
-        const raw = target ? referenceNumber(target, name) : '';
-        const number = raw.replace(/[\\{}%#&$]/g, ch => '\\' + ch);
-        const shown = '\\text{' + (raw ? (m[1] ? '(' + number + ')' : number) : target ? t('未编号') : '??') + '}';
-        edits.push({ from: m.index, to: m.index + m[0].length, text: links && target ? '\\href{an-eqref:' + encodeLabel(key) + '}{' + shown + '}' : shown });
-    }
     for (const edit of edits.sort((a,b) => b.from - a.from || b.to - a.to)) tex = tex.slice(0, edit.from) + edit.text + tex.slice(edit.to);
+    if (resolve) tex = referenceTex(tex, resolve, links);
     if (eq.rows) return starRowEnvironment(tex);
     if (!eq.manual && !eq.multiTag) {
         tex = tex.replace(/^\s*\\begin\{(equation\*?|align\*?|gather\*?)\}([\s\S]*)\\end\{\1\}\s*$/, (_, env: string, body: string) => env.startsWith('align') ? '\\begin{aligned}' + body + '\\end{aligned}' : env.startsWith('gather') ? '\\begin{gathered}' + body + '\\end{gathered}' : body);
@@ -700,4 +734,4 @@ function labelName(key: string, opts: Partial<typeof DEFAULTS> = {}) {
 }
 const validCustomKey = (key: string) => validEnvironmentKey(key, reservedEnvironmentKeys);
 const APPEARANCE_TYPES: Record<string, string[]> = { ...TYPES, algorithm: MEDIA.algorithm };
-export default { migrateReferenceFormats, referenceFormat, environments, referenceOverrides, typeNames, labelName, validCustomKey, TYPES, APPEARANCE_TYPES, MEDIA, ABBR, mediaCanon, canon, DEFAULTS, maskedSource, parse, graph, refText, referenceNumber, taggedTex, splitTarget, labelTarget, encodeLabel, decodeLabel, resolvePath, cleanPath, lineOf, quote, plain };
+export default { migrateReferenceFormats, referenceFormat, environments, referenceOverrides, typeNames, labelName, validCustomKey, TYPES, APPEARANCE_TYPES, MEDIA, ABBR, mediaCanon, canon, DEFAULTS, maskedSource, mathSpans, latexCommands, parse, graph, refText, referenceNumber, taggedTex, referenceTex, splitTarget, labelTarget, encodeLabel, decodeLabel, resolvePath, cleanPath, lineOf, quote, plain };

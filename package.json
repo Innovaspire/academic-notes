@@ -12,14 +12,17 @@
     "test:electron": "node scripts/test-electron.mjs",
     "check:release": "node scripts/check-release.mjs",
     "lint": "eslint src",
-    "test:webkit": "node scripts/test-webkit.mjs"
+    "test:webkit": "node scripts/test-webkit.mjs",
+    "deploy": "node scripts/deploy.mjs",
+    "test:deploy": "node --test tests/deploy.mjs"
   },
   "dependencies": {
     "@codemirror/state": "6.5.0",
     "@codemirror/view": "6.38.6",
     "mathjax-full": "3.2.2",
     "pdf-lib": "1.17.1",
-    "pseudocode": "2.4.1"
+    "pseudocode": "2.4.1",
+    "yaml": "2.9.1"
   },
   "devDependencies": {
     "@types/node": "22.19.15",
@@ -30,8 +33,7 @@
     "eslint-plugin-obsidianmd": "0.4.2",
     "obsidian": "1.13.1",
     "playwright": "1.64.1",
-    "typescript": "5.9.3",
-    "yaml": "2.9.1"
+    "typescript": "5.9.3"
   },
   "engines": {
     "node": ">=22"

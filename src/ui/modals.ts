@@ -8,9 +8,9 @@ import type { App, Editor, TFile, EditorPosition, EditorSuggestContext } from 'o
 import { Modal, FuzzySuggestModal, EditorSuggest, Setting, Notice } from 'obsidian';
 import Engine from '../indexing/engine';
 /** True when the cursor is inside a $$ block; frontmatter, comments and fenced code are masked. */
-function inDisplayMath(editor: Editor, cursor: EditorPosition) {
+function inMath(editor: Editor, cursor: EditorPosition) {
     const before = editor.getRange({ line: 0, ch: 0 }, cursor);
-    return (Engine.maskedSource(before).match(/(?<!\\)\$\$/g) || []).length % 2 === 1;
+    return Engine.mathSpans(before, true).some(span => !span.closed && span.contentFrom <= before.length);
 }
 class ProgressModal extends Modal {
     caption: string;
@@ -33,7 +33,7 @@ class ReferencePicker extends FuzzySuggestModal<SourceRecord> {
     getItems() { return this.plugin.targets(false); }
     getItemText(r: SourceRecord) { return `${Engine.refText(r, this.plugin.settings, r.id || undefined) || Engine.labelName(r.key, this.plugin.settings)} ${r.title || r.tex || ''} — ${r.path} ${r.id ? '^' + r.id : t('添加标签并引用')}`; }
     onChooseItem(r: SourceRecord) { if (!this.file)
-        return; void this.plugin.insertReference(this.editor, this.file, r, this.editor.getCursor('from'), this.editor.getCursor('to'), inDisplayMath(this.editor, this.editor.getCursor()) ? r.kind === 'equation' ? 'eqref' : 'ref' : undefined, r.id || undefined).catch(e => this.plugin.fail(t('插入引用'), e)); }
+        return; void this.plugin.insertReference(this.editor, this.file, r, this.editor.getCursor('from'), this.editor.getCursor('to'), inMath(this.editor, this.editor.getCursor()) ? r.kind === 'equation' ? 'eqref' : 'ref' : undefined, r.id || undefined).catch(e => this.plugin.fail(t('插入引用'), e)); }
 }
 class ReferenceSuggest extends EditorSuggest<SourceRecord> {
     plugin: AcademicNotes;
@@ -47,7 +47,7 @@ class ReferenceSuggest extends EditorSuggest<SourceRecord> {
         if (!m)
             return null;
         this.kind = m[1];
-        this.math = inDisplayMath(editor, cursor);
+        this.math = inMath(editor, cursor);
         // Editing inside an existing \eqref{...}: include its closing brace so the
         // selected suggestion replaces the whole command instead of leaving "}}".
         const closing = m[0].includes('{') && editor.getLine(cursor.line).charAt(cursor.ch) === '}';

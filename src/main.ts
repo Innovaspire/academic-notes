@@ -1,3 +1,6 @@
+import { ReferencePreviews } from './ui/reference-preview';
+import { maintainRenamedPaths } from './workspace/refactor';
+import { RenameReferencePicker } from './ui/rename-reference';
 import { prepareMathLinks } from './export/math-links';
 import { markMathContinuations } from './typography/continuations';
 import { paletteValues, selectedPalette, basePalette, appearanceRoles, migratePaletteSettings } from './rendering/palettes';
@@ -129,6 +132,7 @@ export default class AcademicNotes extends Plugin {
         this.addCommand({ id: 'start-layout-diagnostics', name: t('开始记录排版与滚动诊断（90 秒）'), callback: () => { void this.startLayoutDiagnostics().catch(e => this.fail(t('排版与滚动诊断'), e)); } });
         this.addCommand({ id: 'stop-layout-diagnostics', name: t('停止并保存排版与滚动诊断'), callback: () => { void this.stopLayoutDiagnostics().catch(e => this.fail(t('排版与滚动诊断'), e)); } });
         this.addCommand({ id: 'refresh', name: t("重建定理公式索引并刷新引用"), callback: () => { this.parsed.clear(); this.rebuild().then(() => new Notice(t("索引已重建。"))).catch(e => this.fail(t("重建索引"), e)); } });
+        this.addCommand({ id: 'rename-reference-label', name:t('重命名学术标签'),callback:()=>{void this.rebuild().then(()=>new RenameReferencePicker(this).open()).catch(e=>this.fail(t('重命名学术标签'),e));} });
         this.addCommand({ id: 'insert-reference', name: t("插入定理、公式或图表引用"), editorCallback: (editor, view) => new ReferencePicker(this, editor, view.file).open() });
         this.addCommand({ id: 'label-block', name: t("为光标所在公式、定理或图表添加块 ID"), editorCallback: (editor, view) => this.labelBlock(editor, view.file) });
         this.addCommand({ id: 'insert-environment', name: t('插入学术环境'), editorCallback: editor => new EnvironmentModal(this.app, editor, Engine.environments(this.settings)).open() });
@@ -167,7 +171,7 @@ export default class AcademicNotes extends Plugin {
             if (file) this.dirty.set(file.path, true); this.scheduleIndex(); }));
         this.registerEvent(this.app.vault.on('create', file => { if (file instanceof TFile && file.extension === 'md' && this.included(file)) this.scheduleIndex(); }));
         this.registerEvent(this.app.vault.on('delete', file => { if (file instanceof TFile && file.extension === 'md') this.scheduleIndex(); }));
-        this.registerEvent(this.app.vault.on('rename', (file, oldPath) => { this.catalogRenameQueue = this.catalogRenameQueue.then(() => renameCatalogSources(this, oldPath, file.path)).catch(e => this.fail(t('更新索引来源'), e)); if (!(file instanceof TFile) || file.extension === 'md') { this.graphKey = ''; this.scheduleIndex(); } }));
+        this.registerEvent(this.app.vault.on('rename', (file, oldPath) => { const newPath = file.path; if(file instanceof TFile && file.extension !== 'md')return; this.catalogRenameQueue = this.catalogRenameQueue.then(async () => { if(this.settings.maintainReferencePaths)await maintainRenamedPaths(this,oldPath,newPath); await renameCatalogSources(this,oldPath,newPath); }).catch(e => this.fail(t('维护改名引用'),e)); if (!(file instanceof TFile) || file.extension === 'md') { this.graphKey = ''; this.scheduleIndex(); } }));
         this.registerEvent(this.app.workspace.on('editor-change', (editor, info) => {
             if (info?.file) {
                 this.dirty.set(info.file.path, true);
@@ -177,6 +181,7 @@ export default class AcademicNotes extends Plugin {
         if (typeof this.settings.excludedFolders !== 'string')
             this.settings.excludedFolders = '';
         this.applyAppearance();
+        new ReferencePreviews(this);
         this.registerDomEvent(document, 'click', event => this.followEquationReference(event), true);
         this.registerDomEvent(document, 'keydown', event => {
             if (event.key === 'Enter' || event.key === ' ')
@@ -458,7 +463,7 @@ export default class AcademicNotes extends Plugin {
         this.scheduleIndex();
         new Notice(t('已添加 ^{0}；可用 [[#^{0}]] 引用。', id));
     }
-    private async openRecord(rec: SourceRecord, newLeaf = false) {
+    async openRecord(rec: SourceRecord, newLeaf = false) {
         const file = this.app.vault.getAbstractFileByPath(rec.path);
         if (!(file instanceof TFile))
             throw new Error(t("引用目标文件不存在：") + rec.path);
@@ -645,6 +650,10 @@ export default class AcademicNotes extends Plugin {
             const q = Engine.quote(note.lines[eq.line]).prefix;
             const math = tex.includes('\n') ? '$$\n' + tex.split('\n').map(l => q + l).join('\n') + '\n' + q + '$$' : '$$' + tex + '$$';
             replacements.push({ from: eq.from, to: eq.to, text: math });
+        }
+        for (const math of note.inlineMath || []) {
+            const tex = Engine.referenceTex(math.tex,label=>graph.resolveLabel(label,note.path),true);
+            if (tex !== math.tex) replacements.push({from:math.from,to:math.to,text:'$'+tex+'$'});
         }
         for (const r of note.refs)
             if (!r.embed && r.target && (!this.settings.respectAliases || r.alias === null) && r.syntax === 'wiki') {

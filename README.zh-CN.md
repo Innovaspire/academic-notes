@@ -51,7 +51,7 @@
 
 [目录与导出](https://github.com/Kristal-Boltinn/academic-notes/wiki/Contents-and-export-ZH)
 
-显示公式支持 LaTeX 标签、跨文件引用、按行编号与导出链接，详见[公式引用指南](https://github.com/Kristal-Boltinn/academic-notes/wiki/LaTeX-equation-references-ZH)。
+行内与显示公式支持 LaTeX 引用、按行编号与导出链接。引用预览可查看目标内容和引用来源，改名工具维护标签、数学引用及合订本路径，详见[公式引用指南](https://github.com/Kristal-Boltinn/academic-notes/wiki/LaTeX-equation-references-ZH)。
 
 ## 桌面与移动端
 

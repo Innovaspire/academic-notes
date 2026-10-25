@@ -51,7 +51,7 @@ Optional paragraph indentation and Knuth–Plass line breaking **(Beta)** refine
 
 [Contents and export](https://github.com/Kristal-Boltinn/academic-notes/wiki/Contents-and-export)
 
-Display equations support LaTeX labels and cross-file references, with optional per-row numbering and export links. See the [equation reference guide](https://github.com/Kristal-Boltinn/academic-notes/wiki/LaTeX-equation-references).
+Inline and display equations support LaTeX references, with per-row numbering and export links. Reference previews show target content and incoming references; rename tools maintain labels, math links and book chapter paths. See the [equation reference guide](https://github.com/Kristal-Boltinn/academic-notes/wiki/LaTeX-equation-references).
 
 ## Desktop and mobile
 

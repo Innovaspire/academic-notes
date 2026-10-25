@@ -6,7 +6,9 @@ import { setMathOutput } from './browser-host';
 export function runLatexExportRegression() {
  setMathOutput('svg');
  const a=Engine.parse('A.md',String.raw`$$\begin{align*}a=b \label{eq:first} \\ c=d \label{eq:second}\end{align*}$$`);
- const b=Engine.parse('B.md',String.raw`$$\eqref{A#^eq:second}$$`);
+ const b=Engine.parse('B.md',String.raw`$$\eqref{A#^eq:second}$$
+
+By $\eqref{A#^eq:second}$.`);
  const graph=Engine.graph([a,b],{equationMode:'all'},undefined,new Map([['A.md',{chapter:1,mode:'chapter'}],['B.md',{chapter:2,mode:'chapter'}]]));
  const root=document.createElement('main');root.id='phb-document';document.body.append(root);
  for(const note of [a,b]){
@@ -16,6 +18,7 @@ export function runLatexExportRegression() {
    const box=document.createElement('div');box.dataset.phbBlocks=JSON.stringify(eq.ids);section.append(box);
    box.append(renderMath(Engine.taggedTex(eq,label=>graph.resolveLabel(label,note.path),true),true));
   }
+  for(const inline of note.inlineMath){const p=section.createEl('p');p.append(renderMath(Engine.referenceTex(inline.tex,label=>graph.resolveLabel(label,note.path),true),false));}
   prepareMathLinks(section,graph,note.path);
  }
  if(root.querySelector('[data-mml-node="merror"],mjx-merror'))throw new Error('Invalid exported equation');
