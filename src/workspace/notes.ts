@@ -40,8 +40,9 @@ export function labelInsertion(source: string, record: SourceRecord, settings: P
     const prefix = record.kind === 'equation' || record.diagram ? Engine.quote(note.lines[record.endLine]).prefix : record.depth > 1 ? '> '.repeat(record.depth - 1) : '';
     return { id, at: note.starts[record.endLine] + note.lines[record.endLine].length, text: '\n' + prefix + '\n' + prefix + '^' + id + '\n' };
 }
-export function currentRecord(source: string, original: string, record: SourceRecord, settings: Parameters<typeof Engine.parse>[3]) {
-    const note = Engine.parse(record.path, source, {}, settings), text = original.slice(record.from, record.to);
+export function currentRecord(source: string, original: string, record: SourceRecord, settings: Parameters<typeof Engine.parse>[3], cache: Parameters<typeof Engine.parse>[2] = {}) {
+    // Obsidian's block cache binds IDs written on callout title lines; a bare parse misses them.
+    const note = Engine.parse(record.path, source, cache, settings), text = original.slice(record.from, record.to);
     const matches = note.records.filter(r => r.kind === record.kind && r.key === record.key && source.slice(r.from, r.to) === text);
     const found = source === original ? matches.find(r => r.from === record.from) : matches.length === 1 ? matches[0] : undefined;
     if (!found) throw new Error(t('目标内容已变化或不唯一，请重新选择引用。'));

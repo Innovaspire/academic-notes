@@ -501,10 +501,17 @@ export default class AcademicNotes extends Plugin {
         const original = this.graph?.notes.get(target.path)?.source;
         const targetFile = this.app.vault.getAbstractFileByPath(target.path);
         if (original === undefined || !(targetFile instanceof TFile)) throw new Error(t('目标笔记不存在'));
+        const targetCache = this.app.metadataCache.getFileCache(targetFile) || {};
         let resolved: SourceRecord;
         const update = (source: string) => {
-            resolved = currentRecord(source, original, target, this.settings);
-            if (label && (!resolved.ids.includes(label) || Engine.parse(target.path, source, {}, this.settings).blocks.get(label)?.from !== resolved.from)) throw new Error(t('目标块标签重复'));
+            resolved = currentRecord(source, original, target, this.settings, targetCache);
+            // A re-parse without Obsidian's block cache may miss an ID written on a
+            // callout title line; an unchanged source keeps the indexed IDs.
+            if (source === original && target.id) resolved = { ...resolved, id: target.id, ids: target.ids };
+            if (label && (source !== original || !resolved.ids.includes(label))) {
+                const parsed = Engine.parse(target.path, source, targetCache, this.settings);
+                if (!resolved.ids.includes(label) || parsed.blocks.get(label)?.from !== resolved.from) throw new Error(t('目标块标签重复'));
+            }
             const insertion = resolved.id ? undefined : labelInsertion(source, resolved, this.settings);
             if (insertion) resolved = { ...resolved, id: insertion.id, ids: [insertion.id] };
             const edits = insertion ? [{ from: insertion.at, to: insertion.at, text: insertion.text }] : [];

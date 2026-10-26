@@ -425,7 +425,7 @@ test('reference suggestions keep a typed row label instead of the first label', 
   const ctx = suggest.onTrigger({ line: 0, ch: '$$\\eqref{second'.length }, editor, { path: 'math.md' } as any)!;
   assert.equal(ctx.query, 'second');
   suggest.context = { ...ctx, editor, file: { path: 'math.md' } };
-  suggest.selectSuggestion(rows.equations[0]);
+  suggest.selectSuggestion({ type: 'record', record: rows.equations[0] });
   assert.equal(text, '$$\\eqref{second}$$');
 });
 
@@ -464,12 +464,12 @@ test('reference suggestions insert LaTeX inside display math and links in prose'
   const math = trigger(1, 6)!;
   assert.equal(suggest.math, true);
   suggest.context = { ...math, editor, file: { path: 'math.md' } };
-  suggest.selectSuggestion(target.equations[0]);
+  suggest.selectSuggestion({ type: 'record', record: target.equations[0] });
   assert.equal(text.split('\n')[1], '\\eqref{target#^eq-a}');
   const prose = trigger(4, '前面的 \\eqref'.length)!;
   assert.equal(suggest.math, false);
   suggest.context = { ...prose, editor, file: { path: 'math.md' } };
-  suggest.selectSuggestion(target.equations[0]);
+  suggest.selectSuggestion({ type: 'record', record: target.equations[0] });
   assert.equal(text.split('\n')[4], '前面的 [[target#^eq-a]]');
   assert.equal(trigger(8, 6)!.query, '');
   assert.equal(suggest.math, false);
@@ -480,13 +480,177 @@ test('reference suggestions insert LaTeX inside display math and links in prose'
   const editInside = suggest.onTrigger({ line: 0, ch: '$$\\eqref{foo'.length }, closedEditor, { path: 'math.md' } as any)!;
   assert.equal(editInside.end.ch, '$$\\eqref{foo}'.length);
   suggest.context = { ...editInside, editor: closedEditor, file: { path: 'math.md' } };
-  suggest.selectSuggestion(target.equations[0]);
+  suggest.selectSuggestion({ type: 'record', record: target.equations[0] });
   assert.equal(closed, '$$\\eqref{target#^eq-a}$$');
   const noBrace = '$$\\text{see \\eqref}$$';
   const noBraceOffset = (pos: { line: number; ch: number }) => noBrace.split('\n').slice(0, pos.line).reduce((n, line) => n + line.length + 1, 0) + pos.ch;
   const noBraceEditor: any = { getLine: (line: number) => noBrace.split('\n')[line], getRange: (from: any, to: any) => noBrace.slice(noBraceOffset(from), noBraceOffset(to)), replaceRange: () => {} };
   const cursor = '$$\\text{see \\eqref'.length, unbraced = suggest.onTrigger({ line: 0, ch: cursor }, noBraceEditor, { path: 'math.md' } as any)!;
   assert.equal(unbraced.end.ch, cursor);
+});
+
+function referenceSuggestPlugin(graph: any, inserted?: () => void) {
+  const plugin: any = new AcademicNotes();
+  plugin.settings = { ...Engine.DEFAULTS };
+  plugin.graph = graph;
+  plugin.scheduleIndex = () => {};
+  plugin.insertReference = async (editor: any, file: any, record: any, from: any, to: any, command?: 'eqref' | 'ref', label?: string) => {
+    inserted?.();
+    editor.replaceRange(command ? plugin.makeLatexReference(record, file.path, command, label) : plugin.makeReference({ ...record, id: label || record.id }, file.path), from, to);
+  };
+  return plugin;
+}
+
+function referenceSuggestEditor(initial: string) {
+  let text = initial, cursor = { line: 0, ch: initial.length };
+  const offset = (pos: { line: number; ch: number }) => text.split('\n').slice(0, pos.line).reduce((n, line) => n + line.length + 1, 0) + pos.ch;
+  const editor: any = {
+    getLine: (line: number) => text.split('\n')[line] ?? '',
+    getRange: (from: any, to: any) => text.slice(offset(from), offset(to)),
+    replaceRange: (value: string, from: any, to: any) => { text = text.slice(0, offset(from)) + value + text.slice(offset(to)); },
+    getCursor: () => ({ ...cursor }),
+    setCursor: (at: any) => { cursor = { ...at }; },
+    posToOffset: offset,
+    offsetToPos: (value: number) => ({ line: 0, ch: value })
+  };
+  return { editor, text: () => text, cursor: () => ({ ...cursor }), reset: (value: string, ch: number) => { text = value; cursor = { line: 0, ch }; } };
+}
+
+test('reference suggestions browse by folder and file with manual targets first', () => {
+  const graph = Engine.graph([
+    Engine.parse('ch1/a.md', ['$$x=1 \\label{auto}$$', '', '$$y=2 \\tag{7}$$ ^manual'].join('\n')),
+    Engine.parse('ch1/b.md', '$$z=3 \\label{b}$$'),
+    Engine.parse('ch1/rows.md', ['$$', '\\begin{align*}', 'a &= b \\label{first} \\\\', 'c &= d \\label{second}', '\\end{align*}', '$$'].join('\n')),
+    Engine.parse('ch2/c.md', '$$w=4 \\tag{9}$$ ^c'),
+    Engine.parse('root.md', '$$r=5 \\label{r}$$')
+  ]);
+  let inserted = 0;
+  const plugin = referenceSuggestPlugin(graph, () => inserted++);
+  const harness = referenceSuggestEditor('$$\\eqref{$$'), file = { path: 'ch1/a.md' };
+  const suggest: any = new ReferenceSuggest(plugin);
+  const open = (query: string) => {
+    harness.reset('$$\\eqref{' + query + '}$$', '$$\\eqref{'.length + query.length);
+    const trigger = suggest.onTrigger(harness.cursor(), harness.editor, file)!;
+    suggest.context = { ...trigger, editor: harness.editor, file };
+    return suggest.getSuggestions(suggest.context);
+  };
+
+  const root = open('');
+  assert.deepEqual(root.map((item: any) => item.path), ['ch1/a', 'ch1', 'ch2', 'root']);
+  assert.equal(root[0].current, true);
+  assert.ok(root.slice(1, 3).every((item: any) => item.type === 'folder'));
+
+  const search = open('ch');
+  assert.deepEqual(search.slice(0, 2).map((item: any) => [item.type, item.path]), [['folder', 'ch1'], ['folder', 'ch2']]);
+
+  suggest.selectSuggestion(root.find((item: any) => item.path === 'ch1'));
+  assert.equal(harness.text(), '$$\\eqref{ch1/}$$');
+  assert.equal(inserted, 0);
+
+  const files = open('ch1/');
+  assert.deepEqual(files.map((item: any) => item.path), ['ch1/a', 'ch1/b', 'ch1/rows']);
+  assert.deepEqual(open('ch1').map((item: any) => item.path), ['ch1/a', 'ch1/b', 'ch1/rows']);
+  suggest.selectSuggestion(files[0]);
+  assert.equal(harness.text(), '$$\\eqref{ch1/a/}$$');
+
+  const records = open('ch1/a/');
+  assert.deepEqual(open('ch1/a').map((item: any) => item.record.id), ['manual', 'auto']);
+  assert.ok(records.every((item: any) => item.type === 'record'));
+  assert.deepEqual(records.map((item: any) => item.record.id), ['manual', 'auto']);
+  suggest.selectSuggestion(records[0]);
+  assert.equal(inserted, 1);
+  assert.equal(harness.text(), '$$\\eqref{manual}$$');
+
+  const row = open('ch1/rows/second');
+  assert.deepEqual(row.map((item: any) => item.record.id), ['second', 'first']);
+  suggest.selectSuggestion(row[0]);
+  assert.equal(harness.text(), '$$\\eqref{ch1/rows#^second}$$');
+
+  const shortcut = open('');
+  suggest.selectSuggestion(shortcut[0]);
+  assert.equal(harness.text(), '$$\\eqref{ch1/a/}$$');
+});
+
+test('the current-file shortcut appears once at the top level', () => {
+  const graph = Engine.graph([
+    Engine.parse('root.md', '$$x=1 \\label{a}$$'),
+    Engine.parse('ch/a.md', '$$y=2 \\label{b}$$')
+  ]);
+  const plugin = referenceSuggestPlugin(graph);
+  const harness = referenceSuggestEditor('$$\\eqref{$$'), file = { path: 'root.md' };
+  const suggest: any = new ReferenceSuggest(plugin);
+  harness.reset('$$\\eqref{$$', '$$\\eqref{'.length);
+  const trigger = suggest.onTrigger(harness.cursor(), harness.editor, file)!;
+  suggest.context = { ...trigger, editor: harness.editor, file };
+  const items = suggest.getSuggestions(suggest.context);
+  assert.deepEqual(items.map((item: any) => [item.type, item.current === true, item.path]), [['file', true, 'root'], ['folder', false, 'ch']]);
+});
+
+
+test('dismissing a drilled reference restores the original query text', () => {
+  const graph = Engine.graph([Engine.parse('ch1/a.md', '$$x=1 \\label{a}$$')]);
+  const plugin = referenceSuggestPlugin(graph);
+  const harness = referenceSuggestEditor('$$\\eqref{$$'), file = { path: 'root.md' };
+  const suggest: any = new ReferenceSuggest(plugin);
+  harness.reset('$$\\eqref{}$$', '$$\\eqref{'.length);
+  const trigger = suggest.onTrigger(harness.cursor(), harness.editor, file)!;
+  suggest.context = { ...trigger, editor: harness.editor, file };
+  suggest.selectSuggestion(suggest.getSuggestions(suggest.context).find((item: any) => item.path === 'ch1'));
+  assert.equal(harness.text(), '$$\\eqref{ch1/}$$');
+  suggest.close();
+  assert.equal(harness.text(), '$$\\eqref{}$$');
+});
+
+test('an exact label outranks equations that only mention it', () => {
+  const graph = Engine.graph([
+    Engine.parse('target.md', '$$a^2+b^2=c^2 \\label{eq:pyth}$$'),
+    Engine.parse('noise.md', '$$\\eqref{eq:pyth}$$')
+  ]);
+  const plugin = referenceSuggestPlugin(graph);
+  const harness = referenceSuggestEditor('$$\\eqref{$$'), file = { path: 'root.md' };
+  const suggest: any = new ReferenceSuggest(plugin);
+  harness.reset('$$\\eqref{pyth}$$', '$$\\eqref{pyth'.length);
+  const trigger = suggest.onTrigger(harness.cursor(), harness.editor, file)!;
+  suggest.context = { ...trigger, editor: harness.editor, file };
+  const items = suggest.getSuggestions(suggest.context);
+  assert.equal(items[0].record.id, 'eq:pyth');
+  assert.equal(items[0].record.path, 'target.md');
+});
+
+test('reference commands route by target kind', () => {
+  const graph = Engine.graph([
+    Engine.parse('math.md', '$$x=1 \\label{eq:x}$$'),
+    Engine.parse('notes.md', '> [!thm] A theorem\n> body\n\n^thm')
+  ]);
+  const plugin = referenceSuggestPlugin(graph);
+  let inserted: { command?: 'eqref' | 'ref'; label?: string } = {};
+  plugin.insertReference = async (_editor: any, _file: any, _record: any, _from: any, _to: any, command?: 'eqref' | 'ref', label?: string) => { inserted = { command, label }; };
+  const harness = referenceSuggestEditor('$$\\eqref{$$'), file = { path: 'notes.md' };
+  const suggest: any = new ReferenceSuggest(plugin);
+  const open = (query: string, command: string) => {
+    harness.reset(`$$\\${command}{${query}}$$`, `$$\\${command}{`.length + query.length);
+    const trigger = suggest.onTrigger(harness.cursor(), harness.editor, file)!;
+    suggest.context = { ...trigger, editor: harness.editor, file };
+    return suggest.getSuggestions(suggest.context);
+  };
+  const current = open('', 'ref');
+  assert.equal(current[0].current, true);
+  assert.equal(current[0].path, 'notes');
+  assert.deepEqual(current.map((item: any) => item.path), ['notes', 'math']);
+  assert.deepEqual(open('', 'eqref').map((item: any) => item.path), ['math']);
+  assert.ok(!open('', 'eqref').some((item: any) => item.current));
+  assert.deepEqual(open('math', 'eqref').map((item: any) => item.record.id), ['eq:x']);
+  assert.deepEqual(open('notes', 'eqref'), []);
+  assert.deepEqual(open('math', 'tref'), []);
+  // \ref stays the general list; the selected target still chooses the command.
+  assert.deepEqual(open('math', 'ref').map((item: any) => item.record.id), ['eq:x']);
+  const refs = open('notes', 'ref');
+  assert.deepEqual(refs.map((item: any) => item.record.id), ['thm']);
+  assert.deepEqual(open('notes', 'tref').map((item: any) => item.record.id), ['thm']);
+  suggest.selectSuggestion(refs[0]);
+  assert.deepEqual(inserted, { command: 'ref', label: undefined });
+  suggest.selectSuggestion(open('math', 'ref')[0]);
+  assert.deepEqual(inserted, { command: 'eqref', label: undefined });
 });
 
 

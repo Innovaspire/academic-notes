@@ -1093,9 +1093,39 @@ body .markdown-source-view.mod-cm6 .callout:is([data-callout=figure], [data-call
 .an-order-row > button {
   flex-shrink: 0;
 }
+.an-suggest-title {
+  display: flex;
+  align-items: center;
+  gap: .2em;
+}
 .an-suggest-detail {
   color: var(--text-muted);
   font-size: .85em;
+}
+.an-suggest-icon {
+  display: inline-flex;
+  align-items: center;
+  margin-inline-end: .35em;
+  color: var(--text-muted);
+}
+.an-suggest-icon svg {
+  width: 1em;
+  height: 1em;
+}
+.an-suggest-badge {
+  margin-inline-start: .45em;
+  padding: 0 .35em;
+  border-radius: 3px;
+  font-size: .72em;
+  line-height: 1.5;
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+}
+.an-suggest-nav .an-suggest-title {
+  font-weight: 600;
+}
+.an-suggest-current .an-suggest-title {
+  color: var(--text-accent);
 }
 .an-motif-gallery {
   display: grid;

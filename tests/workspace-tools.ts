@@ -46,6 +46,15 @@ test('reference labelling relocates unique targets but rejects ambiguous edits a
     assert.throws(()=>currentRecord('Replaced',source,record,DEFAULTS));
 });
 
+test('callout title IDs survive a re-parse with the metadata cache', () => {
+    const source = '> [!thm|3.1] Title ^thm\n> body\n';
+    const record = Engine.parse('a.md', source, {}, DEFAULTS).records[0];
+    assert.equal(record.id, null);
+    const cache = { blocks: { thm: { position: { start: { line: 0 }, end: { line: 1 } } } } };
+    assert.equal(Engine.parse('a.md', source, cache, DEFAULTS).records[0].id, 'thm');
+    assert.equal(currentRecord(source, source, record, DEFAULTS, cache).id, 'thm');
+});
+
 test('retired environments keep rendering, counters and profile compatibility', () => {
     const settings = {...DEFAULTS,customEnvironments:JSON.stringify({observation:{name:'Observation',abbr:'obs',style:'thm',numbered:true,retired:true}})};
     const note = Engine.parse('a.md','> [!observation] A\n> Body',{},settings); Engine.graph([note],settings);

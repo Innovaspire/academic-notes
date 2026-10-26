@@ -15,11 +15,12 @@ class Plugin {
   registerEditorExtension() {} registerEditorSuggest() {} registerEvent() {} registerDomEvent() {} register() {}
 }
 class HostComponent { constructor() {} }
+class EditorSuggestStub extends HostComponent { setInstructions() {} }
 const Platform = { isDesktopApp: false, isMobile: true, isIosApp: true };
 const obsidian = {
   Plugin, Platform, getLanguage: () => 'en',
   PluginSettingTab: HostComponent, Modal: HostComponent, FuzzySuggestModal: HostComponent,
-  EditorSuggest: HostComponent, MarkdownRenderChild: HostComponent, MarkdownView: HostComponent,
+  EditorSuggest: EditorSuggestStub, MarkdownRenderChild: HostComponent, MarkdownView: HostComponent,
   Component: HostComponent, TFile: HostComponent, Setting: HostComponent,
   Notice: HostComponent, normalizePath: value => value, finishRenderMath: async () => {}
 };
