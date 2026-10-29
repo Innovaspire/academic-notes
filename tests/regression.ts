@@ -2,6 +2,7 @@ import test from 'node:test';
 import { algorithmBlocks, parseAlgorithm } from '../src/algorithms/model';
 import './kp-solver';
 import './workspace-tools';
+import './reference-suggestions';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import Engine from '../src/indexing/engine';
@@ -425,7 +426,7 @@ test('reference suggestions keep a typed row label instead of the first label', 
   const ctx = suggest.onTrigger({ line: 0, ch: '$$\\eqref{second'.length }, editor, { path: 'math.md' } as any)!;
   assert.equal(ctx.query, 'second');
   suggest.context = { ...ctx, editor, file: { path: 'math.md' } };
-  suggest.selectSuggestion(rows.equations[0]);
+  suggest.selectSuggestion({ type: 'record', record: rows.equations[0] });
   assert.equal(text, '$$\\eqref{second}$$');
 });
 
@@ -464,12 +465,12 @@ test('reference suggestions insert LaTeX inside display math and links in prose'
   const math = trigger(1, 6)!;
   assert.equal(suggest.math, true);
   suggest.context = { ...math, editor, file: { path: 'math.md' } };
-  suggest.selectSuggestion(target.equations[0]);
+  suggest.selectSuggestion({ type: 'record', record: target.equations[0] });
   assert.equal(text.split('\n')[1], '\\eqref{target#^eq-a}');
   const prose = trigger(4, '前面的 \\eqref'.length)!;
   assert.equal(suggest.math, false);
   suggest.context = { ...prose, editor, file: { path: 'math.md' } };
-  suggest.selectSuggestion(target.equations[0]);
+  suggest.selectSuggestion({ type: 'record', record: target.equations[0] });
   assert.equal(text.split('\n')[4], '前面的 [[target#^eq-a]]');
   assert.equal(trigger(8, 6)!.query, '');
   assert.equal(suggest.math, false);
@@ -480,7 +481,7 @@ test('reference suggestions insert LaTeX inside display math and links in prose'
   const editInside = suggest.onTrigger({ line: 0, ch: '$$\\eqref{foo'.length }, closedEditor, { path: 'math.md' } as any)!;
   assert.equal(editInside.end.ch, '$$\\eqref{foo}'.length);
   suggest.context = { ...editInside, editor: closedEditor, file: { path: 'math.md' } };
-  suggest.selectSuggestion(target.equations[0]);
+  suggest.selectSuggestion({ type: 'record', record: target.equations[0] });
   assert.equal(closed, '$$\\eqref{target#^eq-a}$$');
   const noBrace = '$$\\text{see \\eqref}$$';
   const noBraceOffset = (pos: { line: number; ch: number }) => noBrace.split('\n').slice(0, pos.line).reduce((n, line) => n + line.length + 1, 0) + pos.ch;
@@ -488,7 +489,6 @@ test('reference suggestions insert LaTeX inside display math and links in prose'
   const cursor = '$$\\text{see \\eqref'.length, unbraced = suggest.onTrigger({ line: 0, ch: cursor }, noBraceEditor, { path: 'math.md' } as any)!;
   assert.equal(unbraced.end.ch, cursor);
 });
-
 
 test('clickable equation references delegate to the indexed target', async () => {
   const plugin: any = new AcademicNotes(); let opened = '';

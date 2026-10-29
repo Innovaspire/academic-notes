@@ -1,17 +1,13 @@
 import { BookPicker } from './book';
+import { inMath } from './reference-suggest';
 import { t } from '../i18n';
 import { environmentTemplate } from './environment';
 import type { FigureLayout } from '../rendering/figure-layout';
 import type AcademicNotes from '../main';
 import type { SourceRecord } from '../indexing/engine';
-import type { App, Editor, TFile, EditorPosition, EditorSuggestContext } from 'obsidian';
-import { Modal, FuzzySuggestModal, EditorSuggest, Setting, Notice } from 'obsidian';
+import type { App, Editor, TFile } from 'obsidian';
+import { Modal, FuzzySuggestModal, Setting, Notice } from 'obsidian';
 import Engine from '../indexing/engine';
-/** True when the cursor is inside a $$ block; frontmatter, comments and fenced code are masked. */
-function inMath(editor: Editor, cursor: EditorPosition) {
-    const before = editor.getRange({ line: 0, ch: 0 }, cursor);
-    return Engine.mathSpans(before, true).some(span => !span.closed && span.contentFrom <= before.length);
-}
 class ProgressModal extends Modal {
     caption: string;
     output?: HTMLPreElement;
@@ -34,29 +30,6 @@ class ReferencePicker extends FuzzySuggestModal<SourceRecord> {
     getItemText(r: SourceRecord) { return `${Engine.refText(r, this.plugin.settings, r.id || undefined) || Engine.labelName(r.key, this.plugin.settings)} ${r.title || r.tex || ''} — ${r.path} ${r.id ? '^' + r.id : t('添加标签并引用')}`; }
     onChooseItem(r: SourceRecord) { if (!this.file)
         return; void this.plugin.insertReference(this.editor, this.file, r, this.editor.getCursor('from'), this.editor.getCursor('to'), inMath(this.editor, this.editor.getCursor()) ? r.kind === 'equation' ? 'eqref' : 'ref' : undefined, r.id || undefined).catch(e => this.plugin.fail(t('插入引用'), e)); }
-}
-class ReferenceSuggest extends EditorSuggest<SourceRecord> {
-    plugin: AcademicNotes;
-    kind = '';
-    math = false;
-    constructor(plugin: AcademicNotes) { super(plugin.app); this.plugin = plugin; this.limit = 30; }
-    onTrigger(cursor: EditorPosition, editor: Editor, file: TFile | null) {
-        if (!file)
-            return null;
-        const before = editor.getLine(cursor.line).slice(0, cursor.ch), m = before.match(/\\(eqref|tref|ref)(?:[ \t]*\{?[ \t]*([^\n}]*))$/);
-        if (!m)
-            return null;
-        this.kind = m[1];
-        this.math = inMath(editor, cursor);
-        // Editing inside an existing \eqref{...}: include its closing brace so the
-        // selected suggestion replaces the whole command instead of leaving "}}".
-        const closing = m[0].includes('{') && editor.getLine(cursor.line).charAt(cursor.ch) === '}';
-        return { start: { line: cursor.line, ch: cursor.ch - m[0].length }, end: closing ? { line: cursor.line, ch: cursor.ch + 1 } : cursor, query: (m[2] || '').trim() };
-    }
-    getSuggestions(ctx: EditorSuggestContext) { const q = ctx.query.toLowerCase(); return this.plugin.targets(false).filter(r => (this.kind !== 'eqref' || r.kind === 'equation') && (this.kind !== 'tref' || r.kind === 'theorem')).filter(r => (Engine.refText(r, this.plugin.settings, r.id || undefined) + ' ' + r.path + ' ' + (r.title || r.tex) + ' ' + r.id).toLowerCase().includes(q)).slice(0, 30); }
-    renderSuggestion(r: SourceRecord, el: HTMLElement) { el.createDiv({ text: Engine.refText(r, this.plugin.settings, r.id || undefined) || Engine.labelName(r.key, this.plugin.settings), cls: 'an-suggest-title' }); el.createDiv({ text: (r.title || r.tex || '').slice(0, 130) + ' — ' + r.path + (r.id ? '' : ' · ' + t('添加标签并引用')), cls: 'an-suggest-detail' }); }
-    selectSuggestion(r: SourceRecord) { const c = this.context; if (!c?.file)
-        return; this.close(); void this.plugin.insertReference(c.editor, c.file, r, c.start, c.end, this.math ? this.kind === 'eqref' ? 'eqref' : 'ref' : undefined, r.ids.includes(Engine.labelTarget(c.query)?.block || '') ? Engine.labelTarget(c.query)!.block : r.id || undefined).catch(e => this.plugin.fail(t('插入引用'), e)); }
 }
 class EnvironmentModal extends Modal {
     constructor(app: App, private editor: Editor, private customEnvironments: Record<string, import("../indexing/environments").CustomEnvironment> = {}) { super(app); }
@@ -86,4 +59,5 @@ class EnvironmentModal extends Modal {
         }));
     }
 }
-export { ProgressModal, ReferencePicker, ReferenceSuggest, BookPicker, EnvironmentModal };
+export { ReferenceSuggest } from './reference-suggest';
+export { ProgressModal, ReferencePicker, BookPicker, EnvironmentModal };

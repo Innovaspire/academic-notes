@@ -329,7 +329,7 @@ function parse(path: string, source: string, cache: {
                 rec = callouts.filter(r => r.line < ln && r.endLine >= ln && r.depth === q.depth).sort((a, b) => b.line - a.line)[0];
         }
         else
-            rec = records.filter(r => r.endLine === ln).sort((a, b) => a.depth - b.depth || (a.kind === 'theorem' ? -1 : 1))[0];
+            rec = callouts.find(r => r.line === ln) ?? records.filter(r => r.endLine === ln).sort((a, b) => a.depth - b.depth || (a.kind === 'theorem' ? -1 : 1))[0];
         // $$...$$ ^id on its closing line is outside the mathematical content.
         const eq = equations.find(r => r.endLine === ln && m.index >= r.to);
         if (eq)

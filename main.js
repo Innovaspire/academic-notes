@@ -8431,7 +8431,7 @@ var require_Options = __commonJS({
           var prop = Object.getOwnPropertyDescriptor(def, key2);
           var value = prop.value;
           if (Array.isArray(value)) {
-            prop.value = insert([], value, false);
+            prop.value = insert2([], value, false);
           } else if (isObject(value)) {
             prop.value = copy(value);
           }
@@ -8451,7 +8451,7 @@ var require_Options = __commonJS({
       return Object.defineProperties(def.constructor === Expandable ? expandable({}) : {}, props);
     }
     exports2.copy = copy;
-    function insert(dst, src, warn) {
+    function insert2(dst, src, warn) {
       var e_2, _a;
       if (warn === void 0) {
         warn = true;
@@ -8477,11 +8477,11 @@ var require_Options = __commonJS({
               dst[key3] = __spreadArray(__spreadArray([], __read2(dval), false), __read2(sval[exports2.APPEND]), false);
             }
           } else {
-            insert(dval, sval, warn);
+            insert2(dval, sval, warn);
           }
         } else if (Array.isArray(sval)) {
           dst[key3] = [];
-          insert(dst[key3], sval, false);
+          insert2(dst[key3], sval, false);
         } else if (isObject(sval)) {
           dst[key3] = copy(sval);
         } else {
@@ -8504,14 +8504,14 @@ var require_Options = __commonJS({
       }
       return dst;
     }
-    exports2.insert = insert;
+    exports2.insert = insert2;
     function defaultOptions(options) {
       var defs = [];
       for (var _i = 1; _i < arguments.length; _i++) {
         defs[_i - 1] = arguments[_i];
       }
       defs.forEach(function(def) {
-        return insert(options, def, false);
+        return insert2(options, def, false);
       });
       return options;
     }
@@ -8522,7 +8522,7 @@ var require_Options = __commonJS({
         defs[_i - 1] = arguments[_i];
       }
       defs.forEach(function(def) {
-        return insert(options, def, true);
+        return insert2(options, def, true);
       });
       return options;
     }
@@ -65180,6 +65180,17 @@ var ENGLISH = {
   "\u641C\u7D22\u6240\u6709\u73AF\u5883\uFF1B\u9009\u62E9\u65E0\u6807\u7B7E\u5BF9\u8C61\u4F1A\u6DFB\u52A0\u6807\u7B7E\u5E76\u5F15\u7528": "Search all environments; selecting an unlabelled target adds its ID and reference",
   "\u6DFB\u52A0\u6807\u7B7E\u5E76\u5F15\u7528": "Add ID and insert reference",
   "\u63D2\u5165\u5F15\u7528": "Insert reference",
+  "\u8FDB\u5165\u6587\u4EF6\u5939\u3001\u6587\u4EF6\u6216\u63D2\u5165\u5F15\u7528": "Enter a folder or file, or insert the reference",
+  "\u624B\u52A8": "Manual",
+  "\u672C\u6587\u4EF6": "This file",
+  "\u641C\u7D22\u5F53\u524D\u8303\u56F4\u5185\u7684\u6587\u4EF6\u6216\u5F15\u7528": "Search files or references in this location",
+  "\u8FD4\u56DE\u4E0A\u7EA7": "Back",
+  "\u5168\u90E8\u7B14\u8BB0": "All notes",
+  "\u5F53\u524D\u7B14\u8BB0\u5DF2\u53D8\u5316\uFF0C\u8BF7\u91CD\u65B0\u9009\u62E9\u5F15\u7528\u3002": "The current note changed. Please choose the reference again.",
+  "\u5F15\u7528\u5019\u9009\u4F18\u5148\u663E\u793A\u624B\u52A8\u7F16\u53F7": "Prefer manually numbered reference suggestions",
+  "\u9ED8\u8BA4\u6309\u6587\u4EF6\u548C\u6B63\u6587\u987A\u5E8F\u6392\u5217\uFF1B\u5F00\u542F\u540E\u4F18\u5148\u663E\u793A\u624B\u52A8\u7F16\u53F7\u5BF9\u8C61\uFF0C\u7CBE\u786E\u6807\u7B7E\u5339\u914D\u59CB\u7EC8\u4F18\u5148\u3002": "Default to file and document order. Enable to put manual numbers first; exact label matches always take priority.",
+  "{0} \u4E2A\u5F15\u7528": "{0} references",
+  "{0} \u4E2A\u624B\u52A8\u7F16\u53F7": "{0} manually numbered",
   "\u53D6\u6D88\u5BFC\u51FA": "Cancel export",
   "\u6B63\u5728\u53D6\u6D88\u2026": "Cancelling\u2026",
   "\u6E05\u5355\u7B14\u8BB0\u8DEF\u5F84": "Manifest note path",
@@ -66170,7 +66181,7 @@ function parse(path, source, cache = {}, opts = {}) {
       if (!rec)
         rec = callouts.filter((r) => r.line < ln && r.endLine >= ln && r.depth === q.depth).sort((a, b) => b.line - a.line)[0];
     } else
-      rec = records.filter((r) => r.endLine === ln).sort((a, b) => a.depth - b.depth || (a.kind === "theorem" ? -1 : 1))[0];
+      rec = callouts.find((r) => r.line === ln) ?? records.filter((r) => r.endLine === ln).sort((a, b) => a.depth - b.depth || (a.kind === "theorem" ? -1 : 1))[0];
     const eq = equations.find((r) => r.endLine === ln && m.index >= r.to);
     if (eq)
       rec = eq;
@@ -67813,7 +67824,7 @@ var algorithms_default = 'body.an-active .an-algorithm,\nbody.phb-export .an-alg
 
 // src/main.ts
 var Obs2 = __toESM(require("obsidian"));
-var import_obsidian15 = require("obsidian");
+var import_obsidian16 = require("obsidian");
 
 // src/export/document.ts
 var TYPES2 = { "def": ["Definition", "definition", "def"], "thm": ["Theorem", "theorem", "thm"], "lem": ["Lemma", "lemma", "lem"], "prop": ["Proposition", "proposition", "prop", "prp"], "cor": ["Corollary", "corollary", "cor"], "claim": ["Claim", "claim", "clm"], "example": ["Example", "example", "ex", "exa", "exm"], "proof": ["Proof", "proof", "pf"], "remark": ["Remark", "remark", "rem", "rmk"], "axiom": ["Axiom", "axiom", "axm"], "assumption": ["Assumption", "assumption", "asm"], "exercise": ["Exercise", "exercise", "exr"], "conjecture": ["Conjecture", "conjecture", "cnj"], "hypothesis": ["Hypothesis", "hypothesis", "hyp"], "solution": ["Solution", "solution", "sol"] };
@@ -68163,6 +68174,7 @@ var DEFAULTS2 = {
   livePreview: true,
   referencePreview: true,
   maintainReferencePaths: true,
+  referenceManualFirst: false,
   lightPalette: "forest",
   darkPalette: "radiation",
   neutralBody: false,
@@ -68247,9 +68259,9 @@ function solveParagraph(items, width, finalReserve = 0, emergencyStretch = 0) {
       if (++operations > MAX_OPERATIONS) return null;
       const from = points[start].next, naturalEnd = point.naturalEnd;
       if (from >= naturalEnd || boxes[naturalEnd] === boxes[from]) continue;
-      const natural = sums[naturalEnd] - sums[from] + point.extraWidth;
+      const natural2 = sums[naturalEnd] - sums[from] + point.extraWidth;
       const shrink = shrinks[naturalEnd] - shrinks[from];
-      if (natural - shrink > widest + EPSILON) break;
+      if (natural2 - shrink > widest + EPSILON) break;
       const visibleStretch = stretches[naturalEnd] - stretches[from];
       const stretch = visibleStretch + emergencyStretch;
       for (const previous of states[start]) {
@@ -68257,7 +68269,7 @@ function solveParagraph(items, width, finalReserve = 0, emergencyStretch = 0) {
         if (++operations > MAX_OPERATIONS) return null;
         const target = (previous.lineCount === 0 ? firstWidth : followingWidth) - (point.final ? finalReserve : 0);
         if (target <= 0) continue;
-        const difference = target - natural;
+        const difference = target - natural2;
         let ratio = 0;
         if (difference < -EPSILON) {
           if (shrink <= 0) continue;
@@ -68276,8 +68288,8 @@ function solveParagraph(items, width, finalReserve = 0, emergencyStretch = 0) {
         else if (!point.forced) demerits -= point.cost ** 2;
         if (previous.lineCount && Math.abs(previous.fitness - fitness) > 1) demerits += 1e4;
         if (previous.flagged && point.flagged) demerits += 1e4;
-        if (point.final && previous.lineCount && natural < target * 0.18) {
-          demerits += 1800 * (1 - natural / (target * 0.18));
+        if (point.final && previous.lineCount && natural2 < target * 0.18) {
+          demerits += 1800 * (1 - natural2 / (target * 0.18));
         }
         const score = previous.score + demerits;
         if (!Number.isFinite(score)) continue;
@@ -69639,8 +69651,8 @@ function planParagraph(text, offset, width, context, em, indent, letterSpacing =
     const part = parts[i], previous = parts[i - 1], next = parts[i + 1];
     if (previous && previous.kind !== "space" && part.kind !== "space" && (previous.kind === "cjk" || part.kind === "cjk") && !opening.test(previous.text) && !closing.test(part.text))
       tokens.push({ from: part.from, to: part.from, item: { type: "glue", width: 0, stretch: em * 0.12, shrink: 0 } });
-    const natural = context.measureText(part.text).width + (!("letterSpacing" in context) ? [...new Intl.Segmenter(void 0, { granularity: "grapheme" }).segment(part.text)].length * letterSpacing : 0) + (!("wordSpacing" in context) && part.kind === "space" ? part.text.length * wordSpacing : 0);
-    tokens.push({ from: part.from, to: part.to, item: part.kind === "space" && !opening.test(previous?.text || "") && !closing.test(next?.text || "") ? { type: "glue", width: natural, stretch: Math.max(natural * 0.65, em * 0.12), shrink: natural * 0.4 } : { type: "box", width: natural } });
+    const natural2 = context.measureText(part.text).width + (!("letterSpacing" in context) ? [...new Intl.Segmenter(void 0, { granularity: "grapheme" }).segment(part.text)].length * letterSpacing : 0) + (!("wordSpacing" in context) && part.kind === "space" ? part.text.length * wordSpacing : 0);
+    tokens.push({ from: part.from, to: part.to, item: part.kind === "space" && !opening.test(previous?.text || "") && !closing.test(next?.text || "") ? { type: "glue", width: natural2, stretch: Math.max(natural2 * 0.65, em * 0.12), shrink: natural2 * 0.4 } : { type: "box", width: natural2 } });
   }
   if (tokens.length > 900) return null;
   const solution = solveParagraph(tokens.map((token) => token.item), [width - indent - 1, width - 1]);
@@ -70563,6 +70575,171 @@ async function reviewBookReferences(plugin, selection, forExport = true) {
   });
 }
 
+// src/ui/reference-suggest.ts
+var import_obsidian9 = require("obsidian");
+function inMath(editor, cursor) {
+  const before = editor.getRange({ line: 0, ch: 0 }, cursor);
+  return engine_default.mathSpans(before, true).some((span) => !span.closed && span.contentFrom <= before.length);
+}
+var parentPath = (path) => path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
+var baseName = (path) => path.slice(path.lastIndexOf("/") + 1);
+var isManual = (r) => r.rows ? !!(r.id && r.rowTags?.[r.id]) : !!r.manual;
+var natural = (a, b) => a.localeCompare(b, void 0, { numeric: true, sensitivity: "base" });
+var navOrder = (a, b) => a.type === b.type ? natural(a.path, b.path) : a.type === "folder" ? -1 : 1;
+function referenceTree(records) {
+  const files = /* @__PURE__ */ new Map(), folders = /* @__PURE__ */ new Map();
+  for (const r of records) {
+    const file = files.get(r.path) ?? { type: "file", path: r.path, count: 0, manual: 0 };
+    file.count++;
+    file.manual += Number(isManual(r));
+    files.set(r.path, file);
+    for (let dir = parentPath(r.path); dir; dir = parentPath(dir)) {
+      const folder = folders.get(dir) ?? { type: "folder", path: dir, count: 0, manual: 0 };
+      folder.count++;
+      folder.manual += Number(isManual(r));
+      folders.set(dir, folder);
+    }
+  }
+  return { files, folders };
+}
+function referenceSuggestions(plugin, kind, sourcePath, query, scope = { type: "folder", path: "" }, limit = 30) {
+  const all = plugin.targets(false).filter((r) => kind === "eqref" ? r.kind === "equation" : kind === "tref" ? r.kind === "theorem" : true);
+  const records = all.filter((r) => scope.type === "file" ? r.path === scope.path : !scope.path || r.path.startsWith(scope.path + "/"));
+  const q = query.trim().toLowerCase(), tree = referenceTree(records);
+  const nav = scope.type === "file" ? [] : [...tree.folders.values(), ...tree.files.values()].filter((item) => q ? item.path.toLowerCase().includes(q) : parentPath(item.path) === scope.path).sort(navOrder);
+  if (!q && scope.type === "folder") {
+    const current2 = tree.files.get(sourcePath);
+    return (current2 ? [{ ...current2, current: true }, ...nav.filter((item) => item.type !== "file" || item.path !== sourcePath)] : nav).slice(0, limit);
+  }
+  const matches = records.filter((r) => !q || [engine_default.refText(r, plugin.settings, r.id || void 0), r.path, r.title, r.tex, r.id].filter(Boolean).join(" ").toLowerCase().includes(q));
+  const quality = (r) => {
+    if (!q) return 0;
+    const id2 = r.id?.toLowerCase() || "";
+    return id2 === q || id2.endsWith(":" + q) || id2.endsWith("-" + q) ? 0 : id2.includes(q) ? 1 : 2;
+  };
+  matches.sort((a, b) => quality(a) - quality(b) || (plugin.settings.referenceManualFirst ? Number(isManual(b)) - Number(isManual(a)) : 0) || natural(a.path, b.path) || a.line - b.line);
+  const shown = nav.slice(0, 6);
+  return [...shown, ...matches.slice(0, Math.max(0, limit - shown.length)).map((record) => ({ type: "record", record }))];
+}
+function renderReference(item, el, plugin) {
+  const title = el.createDiv({ cls: "an-suggest-title" });
+  if (item.type === "record") {
+    const r = item.record;
+    title.createSpan({ text: engine_default.refText(r, plugin.settings, r.id || void 0) || engine_default.labelName(r.key, plugin.settings) });
+    if (isManual(r)) title.createSpan({ cls: "an-suggest-badge", text: t("\u624B\u52A8") });
+    const row = r.rows?.find((row2) => !!r.id && row2.labels.includes(r.id));
+    const snippet = (r.title || (row ? r.tex?.slice(row.from, row.to) : r.tex) || "").replace(/\s+/g, " ").trim().slice(0, 110);
+    el.createDiv({ cls: "an-suggest-detail", text: [snippet, r.id ? "^" + r.id : t("\u6DFB\u52A0\u6807\u7B7E\u5E76\u5F15\u7528"), r.path].filter(Boolean).join(" \xB7 ") });
+  } else {
+    el.addClass("an-suggest-nav");
+    if (item.current) el.addClass("an-suggest-current");
+    (0, import_obsidian9.setIcon)(title.createSpan({ cls: "an-suggest-icon" }), item.type === "folder" ? "folder" : "file-text");
+    title.createSpan({ text: item.current ? t("\u672C\u6587\u4EF6") : baseName(item.path) + (item.type === "folder" ? "/" : "") });
+    el.createDiv({ cls: "an-suggest-detail", text: [item.path, t("{0} \u4E2A\u5F15\u7528", item.count), item.manual ? t("{0} \u4E2A\u624B\u52A8\u7F16\u53F7", item.manual) : ""].filter(Boolean).join(" \xB7 ") });
+  }
+}
+function insert(plugin, ctx, item, math, query) {
+  const typed = engine_default.labelTarget(query)?.block || "";
+  const label3 = item.ids.includes(typed) ? typed : void 0;
+  return plugin.insertReference(ctx.editor, ctx.file, item, ctx.start, ctx.end, math ? item.kind === "equation" ? "eqref" : "ref" : void 0, label3);
+}
+var ReferenceBrowser = class extends import_obsidian9.SuggestModal {
+  constructor(plugin, origin, kind, math, location) {
+    super(plugin.app);
+    this.plugin = plugin;
+    this.origin = origin;
+    this.kind = kind;
+    this.math = math;
+    this.location = location;
+    this.committing = false;
+    this.original = origin.editor.getValue();
+    this.limit = 100;
+    this.setPlaceholder(t("\u641C\u7D22\u5F53\u524D\u8303\u56F4\u5185\u7684\u6587\u4EF6\u6216\u5F15\u7528"));
+    this.setInstructions([{ command: "\u21B5", purpose: t("\u8FDB\u5165\u6587\u4EF6\u5939\u3001\u6587\u4EF6\u6216\u63D2\u5165\u5F15\u7528") }, { command: "esc", purpose: t("\u53D6\u6D88") }]);
+  }
+  async onOpen() {
+    await super.onOpen();
+    this.modalEl.addClass("an-reference-browser");
+    const navigation = this.modalEl.createDiv({ cls: "an-reference-navigation" });
+    this.inputEl.before(navigation);
+    this.backButton = navigation.createEl("button", { text: t("\u8FD4\u56DE\u4E0A\u7EA7") });
+    this.backButton.addEventListener("click", () => this.navigate({ type: "folder", path: parentPath(this.location.path) }));
+    navigation.createEl("button", { text: t("\u5168\u90E8\u7B14\u8BB0") }).addEventListener("click", () => this.navigate({ type: "folder", path: "" }));
+    this.locationEl = navigation.createSpan({ attr: { "aria-live": "polite" } });
+    this.navigate(this.location);
+  }
+  navigate(location) {
+    this.location = location;
+    if (this.locationEl) this.locationEl.textContent = location.path || t("\u5168\u90E8\u7B14\u8BB0");
+    if (this.backButton) this.backButton.disabled = !location.path;
+    this.inputEl.value = "";
+    this.inputEl.dispatchEvent(new this.inputEl.ownerDocument.defaultView.Event("input", { bubbles: true }));
+    this.inputEl.focus();
+  }
+  getSuggestions(query) {
+    return referenceSuggestions(this.plugin, this.kind, this.origin.file.path, query, this.location, this.limit);
+  }
+  renderSuggestion(item, el) {
+    renderReference(item, el, this.plugin);
+  }
+  selectSuggestion(item) {
+    if (item.type !== "record") {
+      this.navigate(item);
+      return;
+    }
+    this.onChooseSuggestion(item);
+  }
+  onChooseSuggestion(item) {
+    if (item.type !== "record" || this.committing) return;
+    this.committing = true;
+    const query = this.inputEl.value;
+    this.close();
+    try {
+      if (this.origin.editor.getValue() !== this.original || noteEditor(this.plugin, this.origin.file) !== this.origin.editor) throw new Error(t("\u5F53\u524D\u7B14\u8BB0\u5DF2\u53D8\u5316\uFF0C\u8BF7\u91CD\u65B0\u9009\u62E9\u5F15\u7528\u3002"));
+      void insert(this.plugin, this.origin, item.record, this.math, query).catch((e) => this.plugin.fail(t("\u63D2\u5165\u5F15\u7528"), e));
+    } catch (e) {
+      this.plugin.fail(t("\u63D2\u5165\u5F15\u7528"), e);
+    }
+  }
+};
+var ReferenceSuggest = class extends import_obsidian9.EditorSuggest {
+  constructor(plugin) {
+    super(plugin.app);
+    this.plugin = plugin;
+    this.kind = "";
+    this.math = false;
+    this.limit = 30;
+    this.setInstructions([{ command: "\u21B5", purpose: t("\u8FDB\u5165\u6587\u4EF6\u5939\u3001\u6587\u4EF6\u6216\u63D2\u5165\u5F15\u7528") }, { command: "esc", purpose: t("\u53D6\u6D88") }]);
+    plugin.register(() => this.browser?.close());
+  }
+  onTrigger(cursor, editor, file) {
+    if (!file) return null;
+    const before = editor.getLine(cursor.line).slice(0, cursor.ch), m = before.match(/\\(eqref|tref|ref)(?:[ \t]*\{?[ \t]*([^\n}]*))$/);
+    if (!m) return null;
+    this.kind = m[1];
+    this.math = inMath(editor, cursor);
+    const closing2 = m[0].includes("{") && editor.getLine(cursor.line).charAt(cursor.ch) === "}";
+    return { start: { line: cursor.line, ch: cursor.ch - m[0].length }, end: closing2 ? { line: cursor.line, ch: cursor.ch + 1 } : cursor, query: (m[2] || "").trim() };
+  }
+  getSuggestions(ctx) {
+    return referenceSuggestions(this.plugin, this.kind, ctx.file.path, ctx.query, void 0, this.limit);
+  }
+  renderSuggestion(item, el) {
+    renderReference(item, el, this.plugin);
+  }
+  selectSuggestion(item) {
+    const ctx = this.context;
+    if (!ctx?.file) return;
+    const math = this.math;
+    this.close();
+    if (item.type !== "record") {
+      this.browser?.close();
+      this.browser = new ReferenceBrowser(this.plugin, ctx, this.kind, math, item);
+      this.browser.open();
+    } else void insert(this.plugin, ctx, item.record, math, ctx.query).catch((e) => this.plugin.fail(t("\u63D2\u5165\u5F15\u7528"), e));
+  }
+};
+
 // src/ui/environment.ts
 function environmentTemplate(kind, source, count = 2, columns = "auto", height) {
   const used = new Set([...source.matchAll(/\^([A-Za-z0-9-]+)/g)].map((m) => m[1]));
@@ -70609,12 +70786,8 @@ ${children}
 }
 
 // src/ui/modals.ts
-var import_obsidian9 = require("obsidian");
-function inMath(editor, cursor) {
-  const before = editor.getRange({ line: 0, ch: 0 }, cursor);
-  return engine_default.mathSpans(before, true).some((span) => !span.closed && span.contentFrom <= before.length);
-}
-var ProgressModal = class extends import_obsidian9.Modal {
+var import_obsidian10 = require("obsidian");
+var ProgressModal = class extends import_obsidian10.Modal {
   constructor(app, title, cancel) {
     super(app);
     this.cancel = cancel;
@@ -70645,7 +70818,7 @@ var ProgressModal = class extends import_obsidian9.Modal {
       this.titleEl.setText(this.caption + t(" \xB7 \u7ED3\u675F"));
   }
 };
-var ReferencePicker = class extends import_obsidian9.FuzzySuggestModal {
+var ReferencePicker = class extends import_obsidian10.FuzzySuggestModal {
   constructor(plugin, editor, file) {
     super(plugin.app);
     this.plugin = plugin;
@@ -70665,42 +70838,7 @@ var ReferencePicker = class extends import_obsidian9.FuzzySuggestModal {
     void this.plugin.insertReference(this.editor, this.file, r, this.editor.getCursor("from"), this.editor.getCursor("to"), inMath(this.editor, this.editor.getCursor()) ? r.kind === "equation" ? "eqref" : "ref" : void 0, r.id || void 0).catch((e) => this.plugin.fail(t("\u63D2\u5165\u5F15\u7528"), e));
   }
 };
-var ReferenceSuggest = class extends import_obsidian9.EditorSuggest {
-  constructor(plugin) {
-    super(plugin.app);
-    this.kind = "";
-    this.math = false;
-    this.plugin = plugin;
-    this.limit = 30;
-  }
-  onTrigger(cursor, editor, file) {
-    if (!file)
-      return null;
-    const before = editor.getLine(cursor.line).slice(0, cursor.ch), m = before.match(/\\(eqref|tref|ref)(?:[ \t]*\{?[ \t]*([^\n}]*))$/);
-    if (!m)
-      return null;
-    this.kind = m[1];
-    this.math = inMath(editor, cursor);
-    const closing2 = m[0].includes("{") && editor.getLine(cursor.line).charAt(cursor.ch) === "}";
-    return { start: { line: cursor.line, ch: cursor.ch - m[0].length }, end: closing2 ? { line: cursor.line, ch: cursor.ch + 1 } : cursor, query: (m[2] || "").trim() };
-  }
-  getSuggestions(ctx) {
-    const q = ctx.query.toLowerCase();
-    return this.plugin.targets(false).filter((r) => (this.kind !== "eqref" || r.kind === "equation") && (this.kind !== "tref" || r.kind === "theorem")).filter((r) => (engine_default.refText(r, this.plugin.settings, r.id || void 0) + " " + r.path + " " + (r.title || r.tex) + " " + r.id).toLowerCase().includes(q)).slice(0, 30);
-  }
-  renderSuggestion(r, el) {
-    el.createDiv({ text: engine_default.refText(r, this.plugin.settings, r.id || void 0) || engine_default.labelName(r.key, this.plugin.settings), cls: "an-suggest-title" });
-    el.createDiv({ text: (r.title || r.tex || "").slice(0, 130) + " \u2014 " + r.path + (r.id ? "" : " \xB7 " + t("\u6DFB\u52A0\u6807\u7B7E\u5E76\u5F15\u7528")), cls: "an-suggest-detail" });
-  }
-  selectSuggestion(r) {
-    const c = this.context;
-    if (!c?.file)
-      return;
-    this.close();
-    void this.plugin.insertReference(c.editor, c.file, r, c.start, c.end, this.math ? this.kind === "eqref" ? "eqref" : "ref" : void 0, r.ids.includes(engine_default.labelTarget(c.query)?.block || "") ? engine_default.labelTarget(c.query).block : r.id || void 0).catch((e) => this.plugin.fail(t("\u63D2\u5165\u5F15\u7528"), e));
-  }
-};
-var EnvironmentModal = class extends import_obsidian9.Modal {
+var EnvironmentModal = class extends import_obsidian10.Modal {
   constructor(app, editor, customEnvironments = {}) {
     super(app);
     this.editor = editor;
@@ -70711,7 +70849,7 @@ var EnvironmentModal = class extends import_obsidian9.Modal {
     this.contentEl.createEl("p", { text: t("\u5728\u5F53\u524D\u884C\u524D\u63D2\u5165\u5B8C\u6574\u73AF\u5883\uFF0C\u4FDD\u7559\u539F\u6587\uFF1B\u63D2\u5165\u540E\u76F4\u63A5\u586B\u5199\u9009\u4E2D\u7684\u6807\u9898\u3002") });
     let kind = "subfigures", count = 2, columns = "auto", height = "";
     let group;
-    new import_obsidian9.Setting(this.contentEl).setName(t("\u73AF\u5883\u7C7B\u578B")).addDropdown((d) => d.addOptions({
+    new import_obsidian10.Setting(this.contentEl).setName(t("\u73AF\u5883\u7C7B\u578B")).addDropdown((d) => d.addOptions({
       thm: t("\u5B9A\u7406"),
       def: t("\u5B9A\u4E49"),
       proof: t("\u8BC1\u660E"),
@@ -70728,18 +70866,18 @@ var EnvironmentModal = class extends import_obsidian9.Modal {
       group.hidden = kind !== "subfigures";
     }));
     group = this.contentEl.createDiv();
-    new import_obsidian9.Setting(group).setName(t("\u5B50\u56FE\u6570\u91CF")).addDropdown((d) => d.addOptions(Object.fromEntries(Array.from({ length: 11 }, (_, i) => [String(i + 2), String(i + 2)]))).setValue("2").onChange((v) => {
+    new import_obsidian10.Setting(group).setName(t("\u5B50\u56FE\u6570\u91CF")).addDropdown((d) => d.addOptions(Object.fromEntries(Array.from({ length: 11 }, (_, i) => [String(i + 2), String(i + 2)]))).setValue("2").onChange((v) => {
       count = Number(v);
     }));
-    new import_obsidian9.Setting(group).setName(t("\u6700\u5927\u5217\u6570")).setDesc(t("\u81EA\u52A8\uFF1A\u56DB\u5E45\u6700\u591A\u56DB\u5217\uFF0C\u5176\u4F59\u6700\u591A\u4E09\u5217\uFF1B\u7A84\u7A97\u683C\u4F1A\u51CF\u5C11\u5217\u6570\uFF0C\u56DB\u5217\u76F4\u63A5\u53D8\u4E24\u5217\u3002")).addDropdown((d) => d.addOptions({ auto: t("\u81EA\u52A8"), "1": "1", "2": "2", "3": "3", "4": "4" }).setValue("auto").onChange((v) => {
+    new import_obsidian10.Setting(group).setName(t("\u6700\u5927\u5217\u6570")).setDesc(t("\u81EA\u52A8\uFF1A\u56DB\u5E45\u6700\u591A\u56DB\u5217\uFF0C\u5176\u4F59\u6700\u591A\u4E09\u5217\uFF1B\u7A84\u7A97\u683C\u4F1A\u51CF\u5C11\u5217\u6570\uFF0C\u56DB\u5217\u76F4\u63A5\u53D8\u4E24\u5217\u3002")).addDropdown((d) => d.addOptions({ auto: t("\u81EA\u52A8"), "1": "1", "2": "2", "3": "3", "4": "4" }).setValue("auto").onChange((v) => {
       columns = v === "auto" ? v : Number(v);
     }));
-    new import_obsidian9.Setting(group).setName(t("\u7EDF\u4E00\u56FE\u7247\u9AD8\u5EA6\uFF08\u50CF\u7D20\uFF09")).setDesc(t("\u7559\u7A7A\u4FDD\u7559\u5404\u56FE\u7247\u5BBD\u5EA6\uFF1B\u8BBE\u7F6E\u540E\u6574\u7EC4\u7B49\u9AD8\uFF0C\u4E0D\u62C9\u4F38\u3001\u4E0D\u88C1\u526A\uFF0C\u7A7A\u95F4\u4E0D\u8DB3\u65F6\u6574\u7EC4\u7EDF\u4E00\u7F29\u5C0F\u3002")).addText((c) => c.setPlaceholder("180").onChange((v) => {
+    new import_obsidian10.Setting(group).setName(t("\u7EDF\u4E00\u56FE\u7247\u9AD8\u5EA6\uFF08\u50CF\u7D20\uFF09")).setDesc(t("\u7559\u7A7A\u4FDD\u7559\u5404\u56FE\u7247\u5BBD\u5EA6\uFF1B\u8BBE\u7F6E\u540E\u6574\u7EC4\u7B49\u9AD8\uFF0C\u4E0D\u62C9\u4F38\u3001\u4E0D\u88C1\u526A\uFF0C\u7A7A\u95F4\u4E0D\u8DB3\u65F6\u6574\u7EC4\u7EDF\u4E00\u7F29\u5C0F\u3002")).addText((c) => c.setPlaceholder("180").onChange((v) => {
       height = v.trim();
     }));
-    new import_obsidian9.Setting(this.contentEl).addButton((b) => b.setButtonText(t("\u53D6\u6D88")).onClick(() => this.close())).addButton((b) => b.setButtonText(t("\u63D2\u5165")).setCta().onClick(() => {
+    new import_obsidian10.Setting(this.contentEl).addButton((b) => b.setButtonText(t("\u53D6\u6D88")).onClick(() => this.close())).addButton((b) => b.setButtonText(t("\u63D2\u5165")).setCta().onClick(() => {
       if (kind === "subfigures" && height && (!/^\d+$/.test(height) || Number(height) < 16 || Number(height) > 1200)) {
-        new import_obsidian9.Notice(t("\u9AD8\u5EA6\u987B\u4E3A 16\u20131200 \u7684\u6574\u6570\uFF0C\u6216\u7559\u7A7A\u3002"));
+        new import_obsidian10.Notice(t("\u9AD8\u5EA6\u987B\u4E3A 16\u20131200 \u7684\u6574\u6570\uFF0C\u6216\u7559\u7A7A\u3002"));
         return;
       }
       const result = environmentTemplate(kind, this.editor.getValue(), count, columns, height ? Number(height) : void 0);
@@ -70756,7 +70894,7 @@ var EnvironmentModal = class extends import_obsidian9.Modal {
 };
 
 // src/ui/environment-settings.ts
-var import_obsidian10 = require("obsidian");
+var import_obsidian11 = require("obsidian");
 function renderEnvironmentSettings(container, plugin, editor = {}) {
   const syntaxExamples = { name: "Observation", key: "observation" };
   const root = container.createDiv({ cls: "an-environment-settings" });
@@ -70779,7 +70917,7 @@ function renderEnvironmentSettings(container, plugin, editor = {}) {
     const entry = { ...custom || { name: "", abbr: "", style: "thm", numbered: true } };
     let key2 = selected;
     const options = Object.fromEntries([...Object.keys(engine_default.TYPES), ...Object.keys(engine_default.MEDIA), "equation", ...Object.keys(definitions)].map((key3) => [key3, engine_default.typeNames(key3, plugin.settings)[0] + ` [${key3}]`]));
-    new import_obsidian10.Setting(form).setName(t("\u9009\u62E9\u73AF\u5883")).addDropdown((d) => {
+    new import_obsidian11.Setting(form).setName(t("\u9009\u62E9\u73AF\u5883")).addDropdown((d) => {
       d.selectEl.dataset.anControl = "environment";
       return d.addOptions({ ...options, "": t("\u65B0\u5EFA\u73AF\u5883") }).setValue(selected).onChange((value) => {
         d.selectEl.blur();
@@ -70787,29 +70925,29 @@ function renderEnvironmentSettings(container, plugin, editor = {}) {
         draw();
       });
     });
-    new import_obsidian10.Setting(form).setName(t("\u540D\u79F0\u4E0E\u5F15\u7528")).setHeading();
-    if (isNew || custom) new import_obsidian10.Setting(form).setName(t("\u73AF\u5883\u6807\u8BC6")).setDesc(t("\u5982 observation\uFF0C\u5BF9\u5E94 [!observation]\uFF1B\u4F7F\u7528\u5C0F\u5199\u82F1\u6587\u5B57\u6BCD\u3001\u6570\u5B57\u548C\u8FDE\u5B57\u7B26\uFF0C\u4EE5\u5B57\u6BCD\u5F00\u5934\uFF0C\u4E0D\u80FD\u5360\u7528\u5DF2\u6709\u7C7B\u578B\u3002\u4FDD\u5B58\u540E\u4E0D\u53EF\u6539\u540D\u3002")).addText((c) => c.setValue(key2).setDisabled(!!selected).setPlaceholder(syntaxExamples.key).onChange((value) => {
+    new import_obsidian11.Setting(form).setName(t("\u540D\u79F0\u4E0E\u5F15\u7528")).setHeading();
+    if (isNew || custom) new import_obsidian11.Setting(form).setName(t("\u73AF\u5883\u6807\u8BC6")).setDesc(t("\u5982 observation\uFF0C\u5BF9\u5E94 [!observation]\uFF1B\u4F7F\u7528\u5C0F\u5199\u82F1\u6587\u5B57\u6BCD\u3001\u6570\u5B57\u548C\u8FDE\u5B57\u7B26\uFF0C\u4EE5\u5B57\u6BCD\u5F00\u5934\uFF0C\u4E0D\u80FD\u5360\u7528\u5DF2\u6709\u7C7B\u578B\u3002\u4FDD\u5B58\u540E\u4E0D\u53EF\u6539\u540D\u3002")).addText((c) => c.setValue(key2).setDisabled(!!selected).setPlaceholder(syntaxExamples.key).onChange((value) => {
       key2 = value.trim();
     }));
-    new import_obsidian10.Setting(form).setName(t("\u663E\u793A\u540D\u79F0")).setDesc(t("\u7528\u4E8E\u73AF\u5883\u6807\u9898\u53CA\u5F15\u7528\u7684\u5168\u79F0\uFF1B\u53EF\u586B\u5199\u4EFB\u610F\u8BED\u8A00\u3002")).addText((c) => c.setValue(isNew ? entry.name : reference.name || custom?.name || "").setPlaceholder(isNew ? syntaxExamples.name : engine_default.labelName(selected)).onChange((value) => {
+    new import_obsidian11.Setting(form).setName(t("\u663E\u793A\u540D\u79F0")).setDesc(t("\u7528\u4E8E\u73AF\u5883\u6807\u9898\u53CA\u5F15\u7528\u7684\u5168\u79F0\uFF1B\u53EF\u586B\u5199\u4EFB\u610F\u8BED\u8A00\u3002")).addText((c) => c.setValue(isNew ? entry.name : reference.name || custom?.name || "").setPlaceholder(isNew ? syntaxExamples.name : engine_default.labelName(selected)).onChange((value) => {
       reference.name = value;
       entry.name = value;
     }));
-    new import_obsidian10.Setting(form).setName(t("\u5F15\u7528\u7F29\u5199")).addText((c) => c.setValue(isNew ? entry.abbr : reference.abbr || custom?.abbr || "").setPlaceholder(isNew ? "obs" : engine_default.ABBR[selected] || selected).onChange((value) => {
+    new import_obsidian11.Setting(form).setName(t("\u5F15\u7528\u7F29\u5199")).addText((c) => c.setValue(isNew ? entry.abbr : reference.abbr || custom?.abbr || "").setPlaceholder(isNew ? "obs" : engine_default.ABBR[selected] || selected).onChange((value) => {
       reference.abbr = value;
       entry.abbr = value;
     }));
-    new import_obsidian10.Setting(form).setName(t("\u6B64\u73AF\u5883\u7684\u5F15\u7528\u683C\u5F0F")).setDesc(t("\u8FD9\u662F\u5F53\u524D\u73AF\u5883\u552F\u4E00\u7684\u683C\u5F0F\u7F16\u8F91\u5904\u3002\u7559\u7A7A\u6CBF\u7528\u4E0B\u65B9\u663E\u793A\u7684\u9ED8\u8BA4\u503C\uFF1B\u586B\u5199\u540E\u53EA\u8986\u76D6\u6B64\u73AF\u5883\u3002")).addText((c) => c.setValue(reference.format || "").setPlaceholder(isNew ? "{abbr} {number}" : inheritedFormat).onChange((value) => {
+    new import_obsidian11.Setting(form).setName(t("\u6B64\u73AF\u5883\u7684\u5F15\u7528\u683C\u5F0F")).setDesc(t("\u8FD9\u662F\u5F53\u524D\u73AF\u5883\u552F\u4E00\u7684\u683C\u5F0F\u7F16\u8F91\u5904\u3002\u7559\u7A7A\u6CBF\u7528\u4E0B\u65B9\u663E\u793A\u7684\u9ED8\u8BA4\u503C\uFF1B\u586B\u5199\u540E\u53EA\u8986\u76D6\u6B64\u73AF\u5883\u3002")).addText((c) => c.setValue(reference.format || "").setPlaceholder(isNew ? "{abbr} {number}" : inheritedFormat).onChange((value) => {
       reference.format = value;
     }));
     if (isNew || custom) {
-      new import_obsidian10.Setting(form).setName(t("\u57FA\u7840\u5916\u89C2")).addDropdown((d) => d.addOptions(Object.fromEntries(ENVIRONMENT_STYLES.map((style) => [style, engine_default.TYPES[style][0]]))).setValue(entry.style).onChange((value) => {
+      new import_obsidian11.Setting(form).setName(t("\u57FA\u7840\u5916\u89C2")).addDropdown((d) => d.addOptions(Object.fromEntries(ENVIRONMENT_STYLES.map((style) => [style, engine_default.TYPES[style][0]]))).setValue(entry.style).onChange((value) => {
         entry.style = value;
       }));
-      new import_obsidian10.Setting(form).setName(t("\u81EA\u52A8\u7F16\u53F7")).addToggle((c) => c.setValue(entry.numbered).onChange((value) => {
+      new import_obsidian11.Setting(form).setName(t("\u81EA\u52A8\u7F16\u53F7")).addToggle((c) => c.setValue(entry.numbered).onChange((value) => {
         entry.numbered = value;
       }));
-      new import_obsidian10.Setting(form).setName(t("\u505C\u7528\u65B0\u5EFA\u5165\u53E3")).setDesc(t("\u4FDD\u7559\u5DF2\u6709\u73AF\u5883\u7684\u7F16\u53F7\u3001\u6837\u5F0F\u548C\u5F15\u7528\uFF0C\u53EA\u4ECE\u63D2\u5165\u73AF\u5883\u83DC\u5355\u9690\u85CF\u3002")).addToggle((c) => c.setValue(!!entry.retired).onChange((value) => {
+      new import_obsidian11.Setting(form).setName(t("\u505C\u7528\u65B0\u5EFA\u5165\u53E3")).setDesc(t("\u4FDD\u7559\u5DF2\u6709\u73AF\u5883\u7684\u7F16\u53F7\u3001\u6837\u5F0F\u548C\u5F15\u7528\uFF0C\u53EA\u4ECE\u63D2\u5165\u73AF\u5883\u83DC\u5355\u9690\u85CF\u3002")).addToggle((c) => c.setValue(!!entry.retired).onChange((value) => {
         entry.retired = value;
       }));
       form.createEl("p", { text: t("\u4FDD\u5B58\u65B0\u73AF\u5883\u540E\uFF0C\u53EF\u5728\u672C\u9875\u8C03\u6574\u989C\u8272\u548C\u56FE\u6807\uFF1B\u7F16\u53F7\u89C4\u5219\u5728\u72EC\u7ACB\u7684\u7F16\u53F7\u8BBE\u7F6E\u4E2D\u3002") });
@@ -70818,11 +70956,11 @@ function renderEnvironmentSettings(container, plugin, editor = {}) {
 
 ^${selected}-example` });
     }
-    const actions = new import_obsidian10.Setting(form).addButton((b) => b.setButtonText(t("\u4FDD\u5B58")).setCta().onClick(async () => {
+    const actions = new import_obsidian11.Setting(form).addButton((b) => b.setButtonText(t("\u4FDD\u5B58")).setCta().onClick(async () => {
       if (isNew || custom) {
         const current2 = engine_default.environments(plugin.settings);
         if (!engine_default.validCustomKey(key2) || !entry.name.trim() || isNew && (Object.hasOwn(current2, key2) || Object.keys(current2).length >= 64)) {
-          new import_obsidian10.Notice(t("\u8BF7\u68C0\u67E5\u6807\u8BC6\u548C\u540D\u79F0\uFF1B\u6807\u8BC6\u4E0D\u80FD\u91CD\u590D\u6216\u5360\u7528\u5185\u7F6E\u73AF\u5883\u3002"));
+          new import_obsidian11.Notice(t("\u8BF7\u68C0\u67E5\u6807\u8BC6\u548C\u540D\u79F0\uFF1B\u6807\u8BC6\u4E0D\u80FD\u91CD\u590D\u6216\u5360\u7528\u5185\u7F6E\u73AF\u5883\u3002"));
           return;
         }
         current2[key2] = entry;
@@ -70832,7 +70970,7 @@ function renderEnvironmentSettings(container, plugin, editor = {}) {
       all[key2] = reference;
       plugin.settings.referenceOverrides = JSON.stringify(engine_default.referenceOverrides({ ...plugin.settings, referenceOverrides: JSON.stringify(all) }));
       await plugin.saveSettings();
-      new import_obsidian10.Notice(t("\u5DF2\u4FDD\u5B58\u3002"));
+      new import_obsidian11.Notice(t("\u5DF2\u4FDD\u5B58\u3002"));
       selected = key2;
       draw();
     }));
@@ -70863,17 +71001,17 @@ function renderEnvironmentSettings(container, plugin, editor = {}) {
         const records = [...plugin.graph.notes.values()].flatMap((note) => note.records.filter((r) => r.key === selected));
         const paths = [...new Set(records.map((r) => r.path))];
         const key3 = selected, definition = JSON.stringify(engine_default.environments(plugin.settings)[key3]);
-        const modal = new import_obsidian10.Modal(plugin.app);
+        const modal = new import_obsidian11.Modal(plugin.app);
         modal.titleEl.setText(t("\u73AF\u5883\u4F7F\u7528\u60C5\u51B5"));
         modal.contentEl.createEl("p", { text: t("\u6B64\u73AF\u5883\u7528\u4E8E {0} \u7BC7\u5DF2\u7D22\u5F15\u7B14\u8BB0\uFF0C\u5171 {1} \u4E2A\u5757\u3002", paths.length, records.length) });
         modal.contentEl.createEl("p", { text: t("\u6392\u9664\u7D22\u5F15\u7684\u7B14\u8BB0\u4E0D\u5728\u7EDF\u8BA1\u5185\u3002\u5220\u9664\u5B9A\u4E49\u4F1A\u79FB\u9664\u7F16\u53F7\u548C\u6837\u5F0F\uFF0C\u4F46\u4FDD\u7559 Markdown \u539F\u6587\uFF1B\u4E5F\u53EF\u505C\u7528\u65B0\u5EFA\u5165\u53E3\u3002") });
-        for (const path of paths) new import_obsidian10.Setting(modal.contentEl).setName(path).addButton((b) => b.setButtonText(t("\u5B9A\u4F4D")).onClick(() => {
+        for (const path of paths) new import_obsidian11.Setting(modal.contentEl).setName(path).addButton((b) => b.setButtonText(t("\u5B9A\u4F4D")).onClick(() => {
           modal.close();
           void plugin.app.workspace.openLinkText(path, "").catch((e) => plugin.fail(t("\u5B9A\u4F4D"), e));
         }));
-        if (deleting) new import_obsidian10.Setting(modal.contentEl).addButton((b) => b.setButtonText(t("\u5220\u9664\u5B9A\u4E49\uFF0C\u4FDD\u7559\u7B14\u8BB0")).onClick(async () => {
+        if (deleting) new import_obsidian11.Setting(modal.contentEl).addButton((b) => b.setButtonText(t("\u5220\u9664\u5B9A\u4E49\uFF0C\u4FDD\u7559\u7B14\u8BB0")).onClick(async () => {
           if (selected !== key3 || JSON.stringify(engine_default.environments(plugin.settings)[key3]) !== definition) {
-            new import_obsidian10.Notice(t("\u8BBE\u7F6E\u5DF2\u53D8\u5316\uFF0C\u8BF7\u91CD\u65B0\u67E5\u770B\u4F7F\u7528\u60C5\u51B5\u3002"));
+            new import_obsidian11.Notice(t("\u8BBE\u7F6E\u5DF2\u53D8\u5316\uFF0C\u8BF7\u91CD\u65B0\u67E5\u770B\u4F7F\u7528\u60C5\u51B5\u3002"));
             return;
           }
           try {
@@ -70899,8 +71037,8 @@ function renderEnvironmentSettings(container, plugin, editor = {}) {
 }
 
 // src/ui/settings-tab.ts
-var import_obsidian11 = require("obsidian");
-var AcademicSettings = class extends import_obsidian11.PluginSettingTab {
+var import_obsidian12 = require("obsidian");
+var AcademicSettings = class extends import_obsidian12.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.appearanceType = "thm";
@@ -70942,12 +71080,12 @@ var AcademicSettings = class extends import_obsidian11.PluginSettingTab {
     const definitions = this.buildSettingRows();
     const render = (parent, group) => {
       for (const definition of definitions.filter((definition2) => definition2.group === group)) {
-        const setting = new import_obsidian11.Setting(parent).setName(definition.name).setDesc(definition.desc || "");
+        const setting = new import_obsidian12.Setting(parent).setName(definition.name).setDesc(definition.desc || "");
         definition.render(setting);
       }
     };
     if (this.section === "environment") {
-      new import_obsidian11.Setting(panel).setName(t("\u5206\u4EAB\u914D\u8272\u4E0E\u73AF\u5883\u65B9\u6848")).addButton((button) => button.setButtonText(t("\u5BFC\u5165\u6216\u5BFC\u51FA")).onClick(() => new ProfileModal(this.plugin, () => this.refreshSettings()).open()));
+      new import_obsidian12.Setting(panel).setName(t("\u5206\u4EAB\u914D\u8272\u4E0E\u73AF\u5883\u65B9\u6848")).addButton((button) => button.setButtonText(t("\u5BFC\u5165\u6216\u5BFC\u51FA")).onClick(() => new ProfileModal(this.plugin, () => this.refreshSettings()).open()));
       renderEnvironmentSettings(panel, this.plugin, {
         selected: this.appearanceType,
         onSelect: (key2) => {
@@ -70963,12 +71101,12 @@ var AcademicSettings = class extends import_obsidian11.PluginSettingTab {
       details.createEl("summary", { text: t("\u901A\u7528\u5916\u89C2\u9009\u9879") });
       render(details, "appearance");
     } else if (this.section === "numbering") {
-      new import_obsidian11.Setting(panel).setName(t("\u68C0\u67E5\u5B66\u672F\u5F15\u7528")).addButton((button) => button.setButtonText(t("\u6253\u5F00\u68C0\u67E5")).onClick(() => new ReferenceAuditModal(this.plugin).open()));
+      new import_obsidian12.Setting(panel).setName(t("\u68C0\u67E5\u5B66\u672F\u5F15\u7528")).addButton((button) => button.setButtonText(t("\u6253\u5F00\u68C0\u67E5")).onClick(() => new ReferenceAuditModal(this.plugin).open()));
       render(panel, "numbering");
-      new import_obsidian11.Setting(panel).setName(t("\u5F15\u7528\u9ED8\u8BA4\u683C\u5F0F\u4E0E\u7D22\u5F15")).setHeading();
+      new import_obsidian12.Setting(panel).setName(t("\u5F15\u7528\u9ED8\u8BA4\u683C\u5F0F\u4E0E\u7D22\u5F15")).setHeading();
       render(panel, "references");
     } else {
-      if (this.section === "export") new import_obsidian11.Setting(panel).setName(t("\u5B66\u672F\u7D22\u5F15\u7B14\u8BB0")).setDesc(t("\u751F\u6210\u53EF\u5728 Obsidian \u5185\u70B9\u51FB\u8DF3\u8F6C\u7684 Markdown \u7D22\u5F15\u3002")).addButton((button) => button.setButtonText(t("\u751F\u6210\u7D22\u5F15")).onClick(() => new CatalogModal(this.plugin).open()));
+      if (this.section === "export") new import_obsidian12.Setting(panel).setName(t("\u5B66\u672F\u7D22\u5F15\u7B14\u8BB0")).setDesc(t("\u751F\u6210\u53EF\u5728 Obsidian \u5185\u70B9\u51FB\u8DF3\u8F6C\u7684 Markdown \u7D22\u5F15\u3002")).addButton((button) => button.setButtonText(t("\u751F\u6210\u7D22\u5F15")).onClick(() => new CatalogModal(this.plugin).open()));
       render(panel, this.section);
     }
   }
@@ -71013,11 +71151,11 @@ var AcademicSettings = class extends import_obsidian11.PluginSettingTab {
   }
   renderPalette(container) {
     const root = container.createDiv({ cls: "an-palette-settings" }), settings = this.plugin.settings;
-    new import_obsidian11.Setting(root).setName(t("\u6574\u4F53\u914D\u8272")).setHeading();
+    new import_obsidian12.Setting(root).setName(t("\u6574\u4F53\u914D\u8272")).setHeading();
     root.createEl("p", { cls: "an-settings-intro", text: t("\u5148\u9009\u6574\u5957\u914D\u8272\uFF0C\u518D\u5728\u73AF\u5883\u4E2D\u8C03\u6574\u5F15\u7528\u3001\u989C\u8272\u548C\u56FE\u6807\u3002\u6D45\u8272\u548C\u6DF1\u8272\u5404\u4FDD\u5B58\u4E00\u5957\uFF0C\u968F Obsidian \u660E\u6697\u6A21\u5F0F\u5207\u6362\u3002") });
     for (const mode of ["light", "dark"]) {
       const field = mode === "light" ? "lightPalette" : "darkPalette";
-      new import_obsidian11.Setting(root).setName(t(mode === "light" ? "\u6D45\u8272\u914D\u8272" : "\u6DF1\u8272\u914D\u8272")).addDropdown((d) => {
+      new import_obsidian12.Setting(root).setName(t(mode === "light" ? "\u6D45\u8272\u914D\u8272" : "\u6DF1\u8272\u914D\u8272")).addDropdown((d) => {
         d.selectEl.dataset.anControl = field;
         d.addOptions(this.paletteLabels(mode)).setValue(selectedPalette(settings, mode)).onChange(async (value) => {
           d.selectEl.blur();
@@ -71037,7 +71175,7 @@ var AcademicSettings = class extends import_obsidian11.PluginSettingTab {
         });
       });
     }
-    new import_obsidian11.Setting(root).setName(t("\u5F53\u524D\u7F16\u8F91\u7684\u8272\u677F")).addDropdown((d) => {
+    new import_obsidian12.Setting(root).setName(t("\u5F53\u524D\u7F16\u8F91\u7684\u8272\u677F")).addDropdown((d) => {
       d.selectEl.dataset.anControl = "mode";
       d.addOptions({ light: t("\u6D45\u8272"), dark: t("\u6DF1\u8272") }).setValue(this.appearanceMode).onChange((value) => {
         d.selectEl.blur();
@@ -71057,12 +71195,12 @@ var AcademicSettings = class extends import_obsidian11.PluginSettingTab {
     const management = root.createEl("details", { cls: "an-settings-details an-palette-management" });
     management.createEl("summary", { text: t("\u81EA\u5B9A\u4E49\u8272\u677F\u4E0E\u6062\u590D\u9ED8\u8BA4") });
     let name = "";
-    new import_obsidian11.Setting(management).setName(t("\u590D\u5236\u4E3A\u81EA\u5B9A\u4E49\u8272\u677F")).setDesc(t("\u590D\u5236\u5F53\u524D\u8272\u677F\u53CA\u5176\u73AF\u5883\u8986\u76D6\uFF1B\u65B0\u8272\u677F\u53EF\u72EC\u7ACB\u7F16\u8F91\u548C\u6062\u590D\u9ED8\u8BA4\u3002")).addText((c) => c.setPlaceholder(t("\u8272\u677F\u540D\u79F0")).onChange((value) => {
+    new import_obsidian12.Setting(management).setName(t("\u590D\u5236\u4E3A\u81EA\u5B9A\u4E49\u8272\u677F")).setDesc(t("\u590D\u5236\u5F53\u524D\u8272\u677F\u53CA\u5176\u73AF\u5883\u8986\u76D6\uFF1B\u65B0\u8272\u677F\u53EF\u72EC\u7ACB\u7F16\u8F91\u548C\u6062\u590D\u9ED8\u8BA4\u3002")).addText((c) => c.setPlaceholder(t("\u8272\u677F\u540D\u79F0")).onChange((value) => {
       name = value.trim();
     })).addButton((b) => b.setButtonText(t("\u521B\u5EFA\u8272\u677F")).onClick(async () => {
       const all = customPalettes(settings.customPalettes);
       if (!name || Object.keys(all).length >= 32) {
-        new import_obsidian11.Notice(t("\u8BF7\u586B\u5199\u8272\u677F\u540D\u79F0\uFF1B\u6700\u591A 32 \u4E2A\u81EA\u5B9A\u4E49\u8272\u677F\u3002"));
+        new import_obsidian12.Notice(t("\u8BF7\u586B\u5199\u8272\u677F\u540D\u79F0\uFF1B\u6700\u591A 32 \u4E2A\u81EA\u5B9A\u4E49\u8272\u677F\u3002"));
         return;
       }
       let key2 = "custom-" + Date.now().toString(36);
@@ -71076,7 +71214,7 @@ var AcademicSettings = class extends import_obsidian11.PluginSettingTab {
       await this.plugin.saveSettings();
       this.refreshPalette();
     }));
-    new import_obsidian11.Setting(management).setName(t("\u6062\u590D\u6574\u5957\u8272\u677F\u9ED8\u8BA4\u503C")).setDesc(t("\u53EA\u6E05\u9664\u5F53\u524D\u8272\u677F\u7684\u6240\u6709\u73AF\u5883\u8986\u76D6\uFF0C\u5176\u4ED6\u8272\u677F\u4E0D\u53D8\u3002")).addButton((b) => {
+    new import_obsidian12.Setting(management).setName(t("\u6062\u590D\u6574\u5957\u8272\u677F\u9ED8\u8BA4\u503C")).setDesc(t("\u53EA\u6E05\u9664\u5F53\u524D\u8272\u677F\u7684\u6240\u6709\u73AF\u5883\u8986\u76D6\uFF0C\u5176\u4ED6\u8272\u677F\u4E0D\u53D8\u3002")).addButton((b) => {
       b.buttonEl.dataset.anControl = "resetPalette";
       b.setButtonText(t("\u6062\u590D\u9ED8\u8BA4")).onClick(async () => {
         const all = paletteOverrides(settings);
@@ -71087,7 +71225,7 @@ var AcademicSettings = class extends import_obsidian11.PluginSettingTab {
       });
     });
     const custom = customPalettes(settings.customPalettes)[palette];
-    if (custom) new import_obsidian11.Setting(management).setName(t("\u5220\u9664\u5F53\u524D\u81EA\u5B9A\u4E49\u8272\u677F")).addButton((b) => b.setButtonText(t("\u5220\u9664\u8272\u677F")).onClick(async () => {
+    if (custom) new import_obsidian12.Setting(management).setName(t("\u5220\u9664\u5F53\u524D\u81EA\u5B9A\u4E49\u8272\u677F")).addButton((b) => b.setButtonText(t("\u5220\u9664\u8272\u677F")).onClick(async () => {
       const all = customPalettes(settings.customPalettes), overrides = paletteOverrides(settings);
       delete all[palette];
       delete overrides[palette];
@@ -71107,7 +71245,7 @@ var AcademicSettings = class extends import_obsidian11.PluginSettingTab {
       root.createEl("p", { text: t("\u6B64\u73AF\u5883\u4FDD\u6301\u56FE\u8868\u6216\u516C\u5F0F\u7684\u539F\u751F\u6392\u7248\uFF1B\u5F15\u7528\u540D\u79F0\u548C\u683C\u5F0F\u53EF\u5728\u4E0A\u65B9\u8C03\u6574\u3002") });
       return;
     }
-    new import_obsidian11.Setting(root).setName(t("\u989C\u8272\u4E0E\u56FE\u6807")).setHeading();
+    new import_obsidian12.Setting(root).setName(t("\u989C\u8272\u4E0E\u56FE\u6807")).setHeading();
     root.createEl("p", { cls: "an-settings-intro", text: t("\u989C\u8272\u53EF\u76F4\u63A5\u4FEE\u6539\uFF0C\u81EA\u52A8\u4FDD\u5B58\u5230\u5F53\u524D\u8272\u677F\u3002\u540D\u79F0\u4E0E\u5F15\u7528\u4FEE\u6539\u540E\u70B9\u51FB\u4FDD\u5B58\u3002") });
     const palette = selectedPalette(settings, this.appearanceMode), profiles = paletteOverrides(settings);
     const updateOverview = () => {
@@ -71121,7 +71259,7 @@ var AcademicSettings = class extends import_obsidian11.PluginSettingTab {
     const colors = [[field, t("\u73AF\u5883\u4E3B\u8272"), fallback]];
     if (!plain2) colors.push([motifField, t("\u89D2\u6807\u989C\u8272"), entry[field] || fallback]);
     for (const [colorField, name, defaultColor] of colors) {
-      const row = new import_obsidian11.Setting(root).setName(name).setDesc(entry[colorField] || t("\u8DDF\u968F\u5F53\u524D\u8272\u677F\u9ED8\u8BA4\u503C"));
+      const row = new import_obsidian12.Setting(root).setName(name).setDesc(entry[colorField] || t("\u8DDF\u968F\u5F53\u524D\u8272\u677F\u9ED8\u8BA4\u503C"));
       row.addColorPicker((c) => c.setValue(entry[colorField] || defaultColor).onChange(async (value) => {
         await this.changeAppearance(colorField, value);
         row.setDesc(value);
@@ -71140,7 +71278,7 @@ var AcademicSettings = class extends import_obsidian11.PluginSettingTab {
     }
     const names = { laurel: t("\u6708\u6842"), compass: t("\u7F57\u76D8"), rosette: t("\u82B1\u7AE0"), orbit: t("\u8F68\u9053"), lattice: t("\u6676\u683C"), knot: t("\u7F16\u7ED3"), arch: t("\u62F1\u5ECA"), quill: t("\u7FBD\u7B14"), folio: t("\u4E66\u9875") };
     if (!plain2) {
-      new import_obsidian11.Setting(root).setName(t("\u89D2\u6807\u56FE\u6848")).addDropdown((d) => {
+      new import_obsidian12.Setting(root).setName(t("\u89D2\u6807\u56FE\u6848")).addDropdown((d) => {
         d.selectEl.dataset.anControl = "motif";
         d.addOptions({ default: t("\u539F\u6709\u56FE\u6848"), none: t("\u65E0\u89D2\u6807"), ...names }).setValue(entry.motif || "default").onChange(async (value) => {
           await this.changeAppearance("motif", value === "default" ? "" : value);
@@ -71187,7 +71325,7 @@ var AcademicSettings = class extends import_obsidian11.PluginSettingTab {
     updatePreview();
     box.createDiv({ cls: "callout-title" }).createDiv({ cls: "callout-title-inner", text: engine_default.typeNames(this.appearanceType, settings)[0] });
     box.createDiv({ cls: "callout-content" }).createEl("p", { text: t("\u8FD9\u662F\u6240\u9009\u8272\u677F\u7684\u5916\u89C2\u9884\u89C8\u3002") });
-    new import_obsidian11.Setting(root).setName(t("\u6062\u590D\u6B64\u73AF\u5883\u9ED8\u8BA4\u5916\u89C2")).addButton((b) => {
+    new import_obsidian12.Setting(root).setName(t("\u6062\u590D\u6B64\u73AF\u5883\u9ED8\u8BA4\u5916\u89C2")).addButton((b) => {
       b.buttonEl.dataset.anControl = "reset";
       b.setButtonText(t("\u6062\u590D\u9ED8\u8BA4")).onClick(async () => {
         const all = paletteOverrides(settings), profile = all[palette] || {};
@@ -71233,7 +71371,7 @@ var AcademicSettings = class extends import_obsidian11.PluginSettingTab {
     heading(t("Knuth\u2013Plass \u65AD\u884C\uFF08Beta\uFF09"));
     toggle("kpReading", t("\u9605\u8BFB\u89C6\u56FE\u4F7F\u7528 Knuth\u2013Plass \u65AD\u884C"), t("\u6574\u6BB5\u4F18\u5316\u6B63\u6587\u53CA\u6570\u5B66\u73AF\u5883\u7684\u65AD\u884C\u548C\u95F4\u8DDD\uFF1B\u7A97\u53E3\u5BBD\u5EA6\u53D8\u5316\u540E\u91CD\u65B0\u6392\u7248\u3002\u9ED8\u8BA4\u5173\u95ED\uFF0C\u5B9E\u65F6\u9884\u89C8\u4E0E\u6E90\u7801\u4E0D\u53D7\u5F71\u54CD\u3002"));
     toggle("kpLivePreview", t("\u5B9E\u65F6\u9884\u89C8\u4F7F\u7528 Knuth\u2013Plass \u65AD\u884C"), t("\u4F18\u5316\u672A\u7F16\u8F91\u7684\u5355\u884C\u666E\u901A\u6BB5\u843D\u548C\u53EA\u8BFB\u6570\u5B66\u73AF\u5883\u6B63\u6587\uFF1B\u73AF\u5883\u5185\u652F\u6301\u516C\u5F0F\u548C\u94FE\u63A5\u3002\u5149\u6807\u6216\u9009\u533A\u8FDB\u5165\u65F6\u6062\u590D\u539F\u751F\u6392\u7248\uFF0C\u7F16\u8F91\u6807\u9898\u65F6\u4FDD\u6301\u539F\u751F\u3002\u9ED8\u8BA4\u5173\u95ED\u3002"));
-    if (import_obsidian11.Platform.isDesktopApp) toggle("kpPdf", t("PDF \u4F7F\u7528 Knuth\u2013Plass \u65AD\u884C"), t("\u5728\u6700\u7EC8\u6253\u5370\u5BBD\u5EA6\u4E0B\u91CD\u65B0\u6392\u7248\u6B63\u6587\u53CA\u6570\u5B66\u73AF\u5883\uFF1BHTML \u5FEB\u7167\u4FDD\u7559\u6D4F\u89C8\u5668\u6392\u7248\u3002"));
+    if (import_obsidian12.Platform.isDesktopApp) toggle("kpPdf", t("PDF \u4F7F\u7528 Knuth\u2013Plass \u65AD\u884C"), t("\u5728\u6700\u7EC8\u6253\u5370\u5BBD\u5EA6\u4E0B\u91CD\u65B0\u6392\u7248\u6B63\u6587\u53CA\u6570\u5B66\u73AF\u5883\uFF1BHTML \u5FEB\u7167\u4FDD\u7559\u6D4F\u89C8\u5668\u6392\u7248\u3002"));
     description(t("\u652F\u6301 Proof\u3001Remark\u3001\u5B9A\u7406\u7B49\u73AF\u5883\u53CA\u9996\u884C\u7F29\u8FDB\uFF0C\u4FDD\u7559\u6807\u9898\u3001\u516C\u5F0F\u548C\u8BC1\u660E\u7ED3\u675F\u65B9\u6846\u3002\u5B9E\u65F6\u9884\u89C8\u4E2D\u6B63\u5728\u7F16\u8F91\u7684\u6BB5\u843D\u4F7F\u7528\u539F\u751F\u4E24\u7AEF\u5BF9\u9F50\uFF1B\u672A\u7F16\u8F91\u7684\u53EA\u8BFB\u73AF\u5883\u53EF\u4F7F\u7528 KP\u3002\u5217\u8868\u3001\u56FE\u7247\u3001\u663E\u5F0F\u6362\u884C\u548C\u4E0D\u652F\u6301\u6216\u8FC7\u957F\u7684\u5185\u5BB9\u4F7F\u7528\u6D4F\u89C8\u5668\u6392\u7248\uFF1B\u6682\u4E0D\u81EA\u52A8\u65AD\u8BCD\u3002"));
     group = "numbering";
     toggle("numbered", t("\u5B9A\u7406\u7C7B\u73AF\u5883\u81EA\u52A8\u7F16\u53F7"), t("Proof\u3001Remark\u3001Solution \u9ED8\u8BA4\u4E0D\u8BA1\u6570\u3002"));
@@ -71243,6 +71381,7 @@ var AcademicSettings = class extends import_obsidian11.PluginSettingTab {
     select("sectionNumberSource", t("H2 \u8282\u53F7\u6765\u6E90"), { order: t("\u6309 H2 \u51FA\u73B0\u987A\u5E8F\uFF1A1\u30012\u30013"), heading: t("\u4F18\u5148\u4F7F\u7528\u6807\u9898\u5F00\u5934\u7684\u6570\u5B57") }, t("\u53EA\u8BFB\u6E90\u7801\u4E2D\u7684 H2\uFF0C\u4E0D\u8BA1 H3\u3001H6 \u6216\u4EE3\u7801\u5757\u91CC\u7684\u6807\u9898\u3002"));
     toggle("maintainReferencePaths", t("\u6539\u540D\u65F6\u7EF4\u62A4\u5B66\u672F\u5F15\u7528"), t("\u7B14\u8BB0\u6216\u6587\u4EF6\u5939\u6539\u540D\u540E\u66F4\u65B0 LaTeX \u5F15\u7528\u548C\u5408\u8BA2\u672C\u7AE0\u8282\u8DEF\u5F84\u3002"));
     toggle("referencePreview", t("\u5F15\u7528\u5185\u5BB9\u9884\u89C8"), t("\u684C\u9762\u60AC\u505C\u6216\u805A\u7126\u663E\u793A\u9884\u89C8\uFF0C\u79FB\u52A8\u7AEF\u70B9\u6309\u540E\u9009\u62E9\u8DF3\u8F6C\u3002"));
+    toggle("referenceManualFirst", t("\u5F15\u7528\u5019\u9009\u4F18\u5148\u663E\u793A\u624B\u52A8\u7F16\u53F7"), t("\u9ED8\u8BA4\u6309\u6587\u4EF6\u548C\u6B63\u6587\u987A\u5E8F\u6392\u5217\uFF1B\u5F00\u542F\u540E\u4F18\u5148\u663E\u793A\u624B\u52A8\u7F16\u53F7\u5BF9\u8C61\uFF0C\u7CBE\u786E\u6807\u7B7E\u5339\u914D\u59CB\u7EC8\u4F18\u5148\u3002"));
     toggle("shortReferences", t("\u94FE\u63A5\u5F15\u7528\u4F7F\u7528\u7F29\u5199"), t("\u6807\u9898\u4ECD\u4E3A Theorem / Definition\uFF1B\u94FE\u63A5\u663E\u793A thm 2.1 / def 2.1\u3002"));
     toggle("mediaNumbered", t("\u56FE\u3001\u8868\u548C\u5B50\u56FE\u81EA\u52A8\u7F16\u53F7"), t("\u7528 [!figure] / [!table]\uFF1B\u5D4C\u5957 [!subfigure] \u5F97\u5230 (a)\u3001(b)\u3002\u5B89\u88C5\u540E\u5373\u53EF\u4F7F\u7528\u5185\u7F6E\u56FE\u8868\u6837\u5F0F\u3002"));
     toggle("sharedCounter", t("\u4E0D\u540C\u5B9A\u7406\u7C7B\u578B\u5171\u4EAB\u8BA1\u6570\u5668"), t("\u5173\u95ED\u65F6 Definition\u3001Theorem \u7B49\u5404\u81EA\u8BA1\u6570\u3002\u516C\u5F0F\u59CB\u7EC8\u72EC\u7ACB\u3002"));
@@ -71259,22 +71398,22 @@ var AcademicSettings = class extends import_obsidian11.PluginSettingTab {
     toggle("neutralBody", t("\u6846\u5185\u6B63\u6587\u4F7F\u7528\u666E\u901A\u6B63\u6587\u8272"), t("\u5F00\u542F\uFF1A\u6B63\u6587\u4E0E\u7B14\u8BB0\u666E\u901A\u6587\u5B57\u540C\u8272\uFF1B\u5173\u95ED\uFF1A\u6B63\u6587\u6DF7\u5165 36% \u7684\u5F53\u524D\u6846\u8272\u3002\u53EA\u6539\u53D8\u6B63\u6587\uFF0C\u4E0D\u6539\u53D8\u6807\u9898\u3001\u8FB9\u6846\u548C\u5E95\u8272\u3002"));
     toggle("hideMotif", t("\u9690\u85CF\u53F3\u4E0B\u89D2\u5C0F\u56FE\u6848"));
     group = "export";
-    description(import_obsidian11.Platform.isDesktopApp ? t("PDF \u4F7F\u7528 Obsidian \u81EA\u5E26\u7684 Electron \u5F15\u64CE\uFF0C\u65E0\u9700\u5B89\u88C5 Python \u6216\u5916\u90E8\u6D4F\u89C8\u5668\u3002") : t("\u79FB\u52A8\u7AEF\u53EF\u4F7F\u7528\u7F16\u53F7\u3001\u5F15\u7528\u3001\u6837\u5F0F\u548C HTML \u5FEB\u7167\uFF1BPDF \u5BFC\u51FA\u4EC5\u5728\u684C\u9762\u7248\u53EF\u7528\u3002"));
+    description(import_obsidian12.Platform.isDesktopApp ? t("PDF \u4F7F\u7528 Obsidian \u81EA\u5E26\u7684 Electron \u5F15\u64CE\uFF0C\u65E0\u9700\u5B89\u88C5 Python \u6216\u5916\u90E8\u6D4F\u89C8\u5668\u3002") : t("\u79FB\u52A8\u7AEF\u53EF\u4F7F\u7528\u7F16\u53F7\u3001\u5F15\u7528\u3001\u6837\u5F0F\u548C HTML \u5FEB\u7167\uFF1BPDF \u5BFC\u51FA\u4EC5\u5728\u684C\u9762\u7248\u53EF\u7528\u3002"));
     select("tocDepth", t("\u76EE\u5F55\u5C42\u7EA7"), { "1": "1", "2": "2", "3": "3", "4": "4", "5": "5", "6": "6" });
     select("exportNumbering", t("\u5408\u8BA2\u672C\u7F16\u53F7"), { "chapter-section": t("\u7AE0.\u8282.\u5E8F\u53F7\uFF08\u5982 2.3.1\uFF09"), chapter: t("\u7AE0.\u5E8F\u53F7\uFF08\u5982 2.1\uFF0C\u7AE0\u5185\u8FDE\u7EED\uFF09"), note: t("\u4FDD\u7559\u5E93\u5185\u663E\u793A\u7F16\u53F7\uFF08\u53EF\u80FD\u8DE8\u7AE0\u91CD\u53F7\uFF09") }, t("\u524D\u4E24\u79CD\u6309\u5165\u9009\u7AE0\u8282\u91CD\u65B0\u7F16\u53F7\u548C\u89E3\u6790\u5F15\u7528\uFF1B\u4FDD\u7559\u6A21\u5F0F\u6CBF\u7528\u5168\u5E93\u7F16\u53F7\u3002\u539F\u7B14\u8BB0\u4E0D\u6539\u5199\u3002"));
     text("exportFolder", t("\u5BFC\u51FA\u76EE\u5F55"), t("\u5E93\u5185\u76F8\u5BF9\u8DEF\u5F84\uFF0C\u9ED8\u8BA4 _exports\u3002"));
     toggle("captureTheme", t("PDF \u6355\u83B7\u5F53\u524D\u4E3B\u9898\u4E0E\u7247\u6BB5\u6837\u5F0F"), t("\u5173\u95ED\u65F6\u4F7F\u7528\u63D2\u4EF6\u81EA\u5DF1\u7684\u6570\u5B66\u6846\u4E0E\u57FA\u7840\u6392\u7248\u3002"));
-    if (import_obsidian11.Platform.isDesktopApp) {
+    if (import_obsidian12.Platform.isDesktopApp) {
       select("pdfFloatMode", t("\u56FE\u7247\u6392\u7248\u4F18\u5148\u7EA7\uFF08\u5B9E\u9A8C\uFF09"), { off: t("\u76F4\u63A5\u7559\u767D\uFF08\u5173\u95ED\uFF09"), "shrink-move": t("\u7F29\u81F3 80% \u2192 \u6D6E\u52A8 \u2192 \u7559\u767D"), "move-shrink": t("\u6D6E\u52A8 \u2192 \u7F29\u81F3 80% \u2192 \u7559\u767D"), shrink: t("\u4EC5\u7F29\u81F3 80%\uFF0C\u5426\u5219\u7559\u767D"), move: t("\u4EC5\u6D6E\u52A8\uFF0C\u5426\u5219\u7559\u767D") }, t("\u53EA\u8C03\u6574 PDF \u526F\u672C\u4E2D\u7684\u72EC\u7ACB figure\u3002\u6D6E\u52A8\u6700\u591A\u63D0\u524D\u4E09\u6BB5\u666E\u901A\u6B63\u6587\uFF0C\u4E0D\u8DE8\u6807\u9898\u3001\u5217\u8868\u6216\u6570\u5B66\u73AF\u5883\uFF0C\u4E0D\u628A\u56FE\u7247\u79FB\u5165\u73AF\u5883\u3002\u8C03\u6574\u540E\u4EE5\u5B9E\u9645 PDF \u9A8C\u8BC1\uFF1B\u65E0\u6CD5\u5B89\u5168\u6392\u7248\u5219\u7559\u767D\u3002"));
       select("pdfFloatMaxRounds", t("\u6700\u5927\u56FE\u7247\u8C03\u6574\u6B21\u6570"), { "1": "1", "3": "3", "6": "6", "10": "10" }, t("\u6574\u6B21\u5BFC\u51FA\u6700\u591A\u5C1D\u8BD5\u8FD9\u4E9B\u6B21\u6570\uFF1B\u9700\u8981\u66F4\u591A\u5C1D\u8BD5\u65F6\u64A4\u9500\u5168\u90E8\u5B9E\u9A8C\u8C03\u6574\u5E76\u4FDD\u7559\u7559\u767D\u3002\u76EE\u5F55\u6821\u51C6\u6B21\u6570\u5355\u72EC\u8BA1\u7B97\u3002"));
     }
-    if (import_obsidian11.Platform.isDesktopApp) toggle("openPdf", t("\u751F\u6210\u540E\u5728 Obsidian \u6253\u5F00 PDF"));
+    if (import_obsidian12.Platform.isDesktopApp) toggle("openPdf", t("\u751F\u6210\u540E\u5728 Obsidian \u6253\u5F00 PDF"));
     return definitions;
   }
 };
 
 // src/export/pdf.ts
-var import_obsidian12 = require("obsidian");
+var import_obsidian13 = require("obsidian");
 
 // src/export/pagination.ts
 function prepareMediaForPrint() {
@@ -71594,7 +71733,7 @@ var PRINT_SHELL = "data:text/html;charset=utf-8," + encodeURIComponent(
   '<!doctype html><meta charset="utf-8">' + PRINT_POLICY
 );
 function nativeWindow() {
-  if (!import_obsidian12.Platform.isDesktopApp)
+  if (!import_obsidian13.Platform.isDesktopApp)
     throw new Error(t("PDF \u5BFC\u51FA\u4EC5\u5728 Obsidian \u684C\u9762\u7248\u53EF\u7528\u3002"));
   const electron = require("electron");
   const remote = electron.remote || require("@electron/remote");
@@ -71852,10 +71991,10 @@ async function waitForTikz(root, timeout = 6e4, active3 = () => true) {
 }
 
 // src/ui/diagram-modal.ts
-var import_obsidian14 = require("obsidian");
+var import_obsidian15 = require("obsidian");
 
 // src/diagrams/render.ts
-var import_obsidian13 = require("obsidian");
+var import_obsidian14 = require("obsidian");
 
 // src/diagrams/geometry.ts
 var diagramPosition = (data, id2) => {
@@ -71907,7 +72046,7 @@ async function renderDiagram(container, data, selectArrow, selectedArrow = "", s
     if (!text || formulas.has(text)) continue;
     const holder = stage.createSpan();
     try {
-      holder.appendChild((0, import_obsidian13.renderMath)(mathSource(text), false));
+      holder.appendChild((0, import_obsidian14.renderMath)(mathSource(text), false));
     } catch {
     }
     formulas.set(text, holder);
@@ -71915,7 +72054,7 @@ async function renderDiagram(container, data, selectArrow, selectedArrow = "", s
   container.replaceChildren(svg, stage);
   let nativeFinished = true;
   try {
-    await (0, import_obsidian13.finishRenderMath)();
+    await (0, import_obsidian14.finishRenderMath)();
   } catch {
     nativeFinished = false;
   }
@@ -72318,7 +72457,7 @@ function diagramDeletionRange(content, from, to) {
   if (record && marker && record.ids.includes(marker[1])) to += next[0].length;
   return { from, to };
 }
-var DiagramModal = class extends import_obsidian14.Modal {
+var DiagramModal = class extends import_obsidian15.Modal {
   constructor(app, initial, save) {
     super(app);
     this.initial = initial;
@@ -72368,8 +72507,8 @@ async function diagramProcessor(app, source, el, ctx) {
     const remove = actions.createEl("button", { text: t("\u5220\u9664\u4EA4\u6362\u56FE"), cls: "an-diagram-delete" });
     const locate = async () => {
       const file = app.vault.getAbstractFileByPath(ctx.sourcePath);
-      if (!(file instanceof import_obsidian14.TFile)) return;
-      const view = app.workspace.getActiveViewOfType(import_obsidian14.MarkdownView), editor = view?.file?.path === ctx.sourcePath && view.getMode() === "source" ? view.editor : null;
+      if (!(file instanceof import_obsidian15.TFile)) return;
+      const view = app.workspace.getActiveViewOfType(import_obsidian15.MarkdownView), editor = view?.file?.path === ctx.sourcePath && view.getMode() === "source" ? view.editor : null;
       const content = editor ? editor.getValue() : await app.vault.read(file), info = ctx.getSectionInfo(el);
       const matching = diagramBlocks(content).filter((b) => b.source.trim() === source.trim());
       const block = matching.find((b) => b.line === info?.lineStart) || (matching.length === 1 ? matching[0] : null);
@@ -72377,7 +72516,7 @@ async function diagramProcessor(app, source, el, ctx) {
       return { file, editor, content, block };
     };
     const fail = (error) => {
-      new import_obsidian14.Notice(String(error instanceof Error ? error.message : error));
+      new import_obsidian15.Notice(String(error instanceof Error ? error.message : error));
     };
     button.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -72440,7 +72579,7 @@ function safeFolder(value) {
   const raw = (typeof value === "string" ? value : "").trim().replace(/\\/g, "/");
   if (!raw || raw.startsWith("/") || /^[A-Za-z]:/.test(raw) || raw.split("/").some((p) => p === "..") || /[<>:"|?*\x00-\x1f]/.test(raw))
     throw new Error(t("\u5BFC\u51FA\u76EE\u5F55\u987B\u4E3A\u5E93\u5185\u76F8\u5BF9\u8DEF\u5F84\uFF0C\u4E0D\u5141\u8BB8 .. \u6216\u7EDD\u5BF9\u8DEF\u5F84\u3002"));
-  return (0, import_obsidian15.normalizePath)(raw);
+  return (0, import_obsidian16.normalizePath)(raw);
 }
 function dataUrl(blob) {
   return new Promise((resolve, reject) => {
@@ -72450,7 +72589,7 @@ function dataUrl(blob) {
     r.readAsDataURL(blob);
   });
 }
-var AcademicNotes = class extends import_obsidian15.Plugin {
+var AcademicNotes = class extends import_obsidian16.Plugin {
   constructor() {
     super(...arguments);
     this.errors = [];
@@ -72533,7 +72672,7 @@ var AcademicNotes = class extends import_obsidian15.Plugin {
     } });
     this.addCommand({ id: "refresh", name: t("\u91CD\u5EFA\u5B9A\u7406\u516C\u5F0F\u7D22\u5F15\u5E76\u5237\u65B0\u5F15\u7528"), callback: () => {
       this.parsed.clear();
-      this.rebuild().then(() => new import_obsidian15.Notice(t("\u7D22\u5F15\u5DF2\u91CD\u5EFA\u3002"))).catch((e) => this.fail(t("\u91CD\u5EFA\u7D22\u5F15"), e));
+      this.rebuild().then(() => new import_obsidian16.Notice(t("\u7D22\u5F15\u5DF2\u91CD\u5EFA\u3002"))).catch((e) => this.fail(t("\u91CD\u5EFA\u7D22\u5F15"), e));
     } });
     this.addCommand({ id: "rename-reference-label", name: t("\u91CD\u547D\u540D\u5B66\u672F\u6807\u7B7E"), callback: () => {
       void this.rebuild().then(() => new RenameReferencePicker(this).open()).catch((e) => this.fail(t("\u91CD\u547D\u540D\u5B66\u672F\u6807\u7B7E"), e));
@@ -72582,19 +72721,19 @@ var AcademicNotes = class extends import_obsidian15.Plugin {
       this.scheduleIndex();
     }));
     this.registerEvent(this.app.vault.on("create", (file) => {
-      if (file instanceof import_obsidian15.TFile && file.extension === "md" && this.included(file)) this.scheduleIndex();
+      if (file instanceof import_obsidian16.TFile && file.extension === "md" && this.included(file)) this.scheduleIndex();
     }));
     this.registerEvent(this.app.vault.on("delete", (file) => {
-      if (file instanceof import_obsidian15.TFile && file.extension === "md") this.scheduleIndex();
+      if (file instanceof import_obsidian16.TFile && file.extension === "md") this.scheduleIndex();
     }));
     this.registerEvent(this.app.vault.on("rename", (file, oldPath) => {
       const newPath = file.path;
-      if (file instanceof import_obsidian15.TFile && file.extension !== "md") return;
+      if (file instanceof import_obsidian16.TFile && file.extension !== "md") return;
       this.catalogRenameQueue = this.catalogRenameQueue.then(async () => {
         if (this.settings.maintainReferencePaths) await maintainRenamedPaths(this, oldPath, newPath);
         await renameCatalogSources(this, oldPath, newPath);
       }).catch((e) => this.fail(t("\u7EF4\u62A4\u6539\u540D\u5F15\u7528"), e));
-      if (!(file instanceof import_obsidian15.TFile) || file.extension === "md") {
+      if (!(file instanceof import_obsidian16.TFile) || file.extension === "md") {
         this.graphKey = "";
         this.scheduleIndex();
       }
@@ -72665,7 +72804,7 @@ var AcademicNotes = class extends import_obsidian15.Plugin {
   }
   fail(where, error) {
     this.recordError(where, error);
-    new import_obsidian15.Notice(t("{0}\u5931\u8D25\uFF1A{1}\n\u53EF\u8FD0\u884C\u201C\u68C0\u67E5\u63D2\u4EF6\u72B6\u6001\u4E0E\u5BFC\u51FA\u73AF\u5883\u201D\u3002", where, error instanceof Error ? error.message : String(error)), 13e3);
+    new import_obsidian16.Notice(t("{0}\u5931\u8D25\uFF1A{1}\n\u53EF\u8FD0\u884C\u201C\u68C0\u67E5\u63D2\u4EF6\u72B6\u6001\u4E0E\u5BFC\u51FA\u73AF\u5883\u201D\u3002", where, error instanceof Error ? error.message : String(error)), 13e3);
   }
   async saveSettings() {
     await this.saveData(this.settings);
@@ -72682,7 +72821,7 @@ var AcademicNotes = class extends import_obsidian15.Plugin {
         this.recordError(t("\u5237\u65B0\u7F16\u8F91\u5668"), error);
       }
     }
-    new import_obsidian15.Notice(t(this.previewPaused ? "\u5DF2\u6682\u505C\u672C\u6B21\u4F1A\u8BDD\u7684\u5B9E\u65F6\u9884\u89C8\u589E\u5F3A\uFF1B\u9605\u8BFB\u4E0E\u5BFC\u51FA\u4E0D\u53D7\u5F71\u54CD\u3002" : "\u5DF2\u6062\u590D\u5B9E\u65F6\u9884\u89C8\u589E\u5F3A\u3002"));
+    new import_obsidian16.Notice(t(this.previewPaused ? "\u5DF2\u6682\u505C\u672C\u6B21\u4F1A\u8BDD\u7684\u5B9E\u65F6\u9884\u89C8\u589E\u5F3A\uFF1B\u9605\u8BFB\u4E0E\u5BFC\u51FA\u4E0D\u53D7\u5F71\u54CD\u3002" : "\u5DF2\u6062\u590D\u5B9E\u65F6\u9884\u89C8\u589E\u5F3A\u3002"));
   }
   applyAppearance() {
     if (!this.active)
@@ -72744,7 +72883,7 @@ var AcademicNotes = class extends import_obsidian15.Plugin {
       metrics.files = files.length;
       const open = /* @__PURE__ */ new Map();
       for (const leaf of this.app.workspace.getLeavesOfType("markdown")) {
-        if (leaf.view instanceof import_obsidian15.MarkdownView && leaf.view.file && leaf.view.getMode() === "source")
+        if (leaf.view instanceof import_obsidian16.MarkdownView && leaf.view.file && leaf.view.getMode() === "source")
           open.set(leaf.view.file.path, leaf.view.editor.getValue());
       }
       for (let i = 0; i < files.length; i++) {
@@ -72874,7 +73013,7 @@ var AcademicNotes = class extends import_obsidian15.Plugin {
       void showCatalogStatus(this, el, ctx).catch((e) => this.recordError(t("\u68C0\u67E5\u7D22\u5F15\u72B6\u6001"), e));
       layout2?.refresh();
     };
-    class Reader extends import_obsidian15.MarkdownRenderChild {
+    class Reader extends import_obsidian16.MarkdownRenderChild {
       constructor(el2, owner) {
         super(el2);
         this.owner = owner;
@@ -72942,13 +73081,13 @@ var AcademicNotes = class extends import_obsidian15.Plugin {
       el.replaceWith(nav);
     else
       el.replaceChildren(nav);
-    const child = new import_obsidian15.MarkdownRenderChild(nav);
+    const child = new import_obsidian16.MarkdownRenderChild(nav);
     ctx.addChild(child);
     const links = [...nav.querySelectorAll("[data-phb-target]")];
     for (let i = 0; i < links.length; i++) {
       const a = links[i];
       a.replaceChildren();
-      await import_obsidian15.MarkdownRenderer.render(this.app, list[i].heading, a, ctx.sourcePath, child);
+      await import_obsidian16.MarkdownRenderer.render(this.app, list[i].heading, a, ctx.sourcePath, child);
       if (a.firstElementChild?.tagName === "P")
         a.replaceChildren(...a.firstElementChild.childNodes);
     }
@@ -72960,25 +73099,25 @@ var AcademicNotes = class extends import_obsidian15.Plugin {
     const note = engine_default.parse(file.path, editor.getValue(), {}, this.settings), line = editor.getCursor().line;
     const r = note.records.filter((r2) => r2.line <= line && r2.endLine >= line).sort((a, b) => b.line - a.line)[0];
     if (!r) {
-      new import_obsidian15.Notice(t("\u8BF7\u628A\u5149\u6807\u653E\u5230 $$ \u516C\u5F0F\u5757\u6216\u5B9A\u7406\u3001figure\u3001subfigure\u3001table callout \u5185\u3002"));
+      new import_obsidian16.Notice(t("\u8BF7\u628A\u5149\u6807\u653E\u5230 $$ \u516C\u5F0F\u5757\u6216\u5B9A\u7406\u3001figure\u3001subfigure\u3001table callout \u5185\u3002"));
       return;
     }
     if (r.id) {
-      new import_obsidian15.Notice(t("\u8BE5\u5757\u5DF2\u6709 ID\uFF1A^") + r.id);
+      new import_obsidian16.Notice(t("\u8BE5\u5757\u5DF2\u6709 ID\uFF1A^") + r.id);
       return;
     }
     const insertion = labelInsertion(editor.getValue(), r, this.settings), id2 = insertion.id;
     editor.replaceRange(insertion.text, { line: r.endLine, ch: note.lines[r.endLine].length });
     this.scheduleIndex();
-    new import_obsidian15.Notice(t("\u5DF2\u6DFB\u52A0 ^{0}\uFF1B\u53EF\u7528 [[#^{0}]] \u5F15\u7528\u3002", id2));
+    new import_obsidian16.Notice(t("\u5DF2\u6DFB\u52A0 ^{0}\uFF1B\u53EF\u7528 [[#^{0}]] \u5F15\u7528\u3002", id2));
   }
   async openRecord(rec, newLeaf = false) {
     const file = this.app.vault.getAbstractFileByPath(rec.path);
-    if (!(file instanceof import_obsidian15.TFile))
+    if (!(file instanceof import_obsidian16.TFile))
       throw new Error(t("\u5F15\u7528\u76EE\u6807\u6587\u4EF6\u4E0D\u5B58\u5728\uFF1A") + rec.path);
     const leaf = this.app.workspace.getLeaf(newLeaf ? "tab" : false);
     await leaf.openFile(file, { active: true, eState: { line: rec.line } });
-    if (leaf.view instanceof import_obsidian15.MarkdownView) {
+    if (leaf.view instanceof import_obsidian16.MarkdownView) {
       leaf.view.setEphemeralState({ line: rec.line });
       if (leaf.view.getMode() === "source") {
         const from = { line: rec.line, ch: 0 };
@@ -73016,7 +73155,7 @@ var AcademicNotes = class extends import_obsidian15.Plugin {
     const initial = editor.getValue(), start = editor.posToOffset(from), end = editor.posToOffset(to);
     const original = this.graph?.notes.get(target.path)?.source;
     const targetFile = this.app.vault.getAbstractFileByPath(target.path);
-    if (original === void 0 || !(targetFile instanceof import_obsidian15.TFile)) throw new Error(t("\u76EE\u6807\u7B14\u8BB0\u4E0D\u5B58\u5728"));
+    if (original === void 0 || !(targetFile instanceof import_obsidian16.TFile)) throw new Error(t("\u76EE\u6807\u7B14\u8BB0\u4E0D\u5B58\u5728"));
     let resolved;
     const update = (source) => {
       resolved = currentRecord(source, original, target, this.settings);
@@ -73031,7 +73170,7 @@ var AcademicNotes = class extends import_obsidian15.Plugin {
     if (target.path === file.path) replaceBuffer(editor, update(initial));
     else {
       await editNote(this, targetFile, update);
-      const attached = this.app.workspace.getLeavesOfType("markdown").some((leaf) => leaf.view instanceof import_obsidian15.MarkdownView && leaf.view.editor === editor && leaf.view.file?.path === file.path);
+      const attached = this.app.workspace.getLeavesOfType("markdown").some((leaf) => leaf.view instanceof import_obsidian16.MarkdownView && leaf.view.editor === editor && leaf.view.file?.path === file.path);
       if (!attached || editor.getValue() !== initial) throw new Error(t("\u76EE\u6807\u6807\u7B7E\u5DF2\u51C6\u5907\u597D\uFF0C\u4F46\u5F53\u524D\u7B14\u8BB0\u5DF2\u53D8\u5316\uFF0C\u8BF7\u91CD\u65B0\u63D2\u5165\u5F15\u7528\u3002"));
       editor.replaceRange(format({ ...resolved, path: targetFile.path }), from, to);
     }
@@ -73047,7 +73186,7 @@ var AcademicNotes = class extends import_obsidian15.Plugin {
     return this.graph ? [...this.graph.notes.values()].flatMap((n) => n.records.filter((r) => !labelledOnly || r.id).flatMap((r) => r.rowGroups ? [.../* @__PURE__ */ new Set([...r.id ? [r.id] : [], ...r.rowGroups.flat()])].filter((id2) => n.blocks.get(id2) === r).map((id2) => ({ ...r, id: id2 })) : [r])) : [];
   }
   pluginDir() {
-    return this.manifest.dir || (0, import_obsidian15.normalizePath)(this.app.vault.configDir + "/plugins/" + this.manifest.id);
+    return this.manifest.dir || (0, import_obsidian16.normalizePath)(this.app.vault.configDir + "/plugins/" + this.manifest.id);
   }
   async mkdir(folder) {
     let p = "";
@@ -73059,7 +73198,7 @@ var AcademicNotes = class extends import_obsidian15.Plugin {
   }
   async resolveSelection(isBook, sourceFile) {
     const file = sourceFile || this.app.workspace.getActiveFile();
-    if (!(file instanceof import_obsidian15.TFile) || file.extension !== "md")
+    if (!(file instanceof import_obsidian16.TFile) || file.extension !== "md")
       throw new Error(t("\u8BF7\u5148\u6253\u5F00\u4E00\u7BC7 Markdown \u7B14\u8BB0\u3002"));
     const source = noteEditor(this, file)?.getValue() ?? await this.app.vault.cachedRead(file);
     const fm = frontmatter(source).data;
@@ -73075,7 +73214,7 @@ var AcademicNotes = class extends import_obsidian15.Plugin {
         throw new Error(t("\u7AE0\u8282\u8DEF\u5F84\u683C\u5F0F\u4E0D\u6B63\u786E\u3002"));
       const path = raw.replace(/^\[\[|\]\]$/g, "").split("|")[0];
       const f = this.app.vault.getAbstractFileByPath(path) || this.app.metadataCache.getFirstLinkpathDest(path, file.path);
-      if (!(f instanceof import_obsidian15.TFile) || f.extension !== "md")
+      if (!(f instanceof import_obsidian16.TFile) || f.extension !== "md")
         throw new Error(t("\u627E\u4E0D\u5230\u7AE0\u8282\uFF1A") + path);
       if (seen.has(f.path))
         throw new Error(t("\u91CD\u590D\u7AE0\u8282\uFF1A") + f.path);
@@ -73096,11 +73235,11 @@ var AcademicNotes = class extends import_obsidian15.Plugin {
   }
   async exportSelection(selection, pdf = true) {
     if (pdf && !Obs2.Platform.isDesktopApp) {
-      new import_obsidian15.Notice(t("PDF \u5BFC\u51FA\u4EC5\u5728 Obsidian \u684C\u9762\u7248\u53EF\u7528\u3002"));
+      new import_obsidian16.Notice(t("PDF \u5BFC\u51FA\u4EC5\u5728 Obsidian \u684C\u9762\u7248\u53EF\u7528\u3002"));
       return;
     }
     if (this.busy) {
-      new import_obsidian15.Notice(t("\u5DF2\u6709\u5BFC\u51FA\u4EFB\u52A1\u6B63\u5728\u8FD0\u884C\u3002"));
+      new import_obsidian16.Notice(t("\u5DF2\u6709\u5BFC\u51FA\u4EFB\u52A1\u6B63\u5728\u8FD0\u884C\u3002"));
       return;
     }
     if (selection.options.book) {
@@ -73111,7 +73250,7 @@ var AcademicNotes = class extends import_obsidian15.Plugin {
         return;
       }
       if (this.busy) {
-        new import_obsidian15.Notice(t("\u5DF2\u6709\u5BFC\u51FA\u4EFB\u52A1\u6B63\u5728\u8FD0\u884C\u3002"));
+        new import_obsidian16.Notice(t("\u5DF2\u6709\u5BFC\u51FA\u4EFB\u52A1\u6B63\u5728\u8FD0\u884C\u3002"));
         return;
       }
     }
@@ -73143,11 +73282,11 @@ var AcademicNotes = class extends import_obsidian15.Plugin {
           await this.app.vault.adapter.write(out.replace(/\.pdf$/, ".report.json"), JSON.stringify(result.report, null, 2));
           this.lastPdfExport = { status: "success", time: (/* @__PURE__ */ new Date()).toISOString(), output: out, report: result.report };
           log.line(t("\u5DF2\u5B8C\u6210\uFF1A") + out);
-          new import_obsidian15.Notice(t("PDF \u5DF2\u4FDD\u5B58\uFF1A") + out, 1e4);
+          new import_obsidian16.Notice(t("PDF \u5DF2\u4FDD\u5B58\uFF1A") + out, 1e4);
           if (this.settings.openPdf) {
             for (let i = 0; i < 15; i++) {
               const f = this.app.vault.getAbstractFileByPath(out);
-              if (f instanceof import_obsidian15.TFile) {
+              if (f instanceof import_obsidian16.TFile) {
                 await this.app.workspace.getLeaf("tab").openFile(f);
                 break;
               }
@@ -73158,7 +73297,7 @@ var AcademicNotes = class extends import_obsidian15.Plugin {
           this.pdfJobs.delete(controller);
         }
       } else
-        new import_obsidian15.Notice(t("HTML \u5FEB\u7167\u5DF2\u4FDD\u5B58\uFF1A") + snapshot);
+        new import_obsidian16.Notice(t("HTML \u5FEB\u7167\u5DF2\u4FDD\u5B58\uFF1A") + snapshot);
       log.done();
     } catch (e) {
       if (controller.signal.aborted) {
@@ -73253,12 +73392,12 @@ var AcademicNotes = class extends import_obsidian15.Plugin {
       for (const ref of n.refs)
         if (!ref.target)
           warnings.push(t("{0}:{1} \u5F15\u7528\u76EE\u6807\u672A\u7EB3\u5165\u672C\u6B21\u5BFC\u51FA\u6216\u4E0D\u53EF\u89E3\u6790\uFF1A{2}", n.path, ref.line + 1, ref.raw));
-    const doc = this.app.workspace.getActiveViewOfType(import_obsidian15.MarkdownView)?.containerEl.ownerDocument || document;
+    const doc = this.app.workspace.getActiveViewOfType(import_obsidian16.MarkdownView)?.containerEl.ownerDocument || document;
     const stage = doc.win.createEl("main");
     stage.id = "phb-document";
     stage.className = "phb-export-stage markdown-preview-view markdown-rendered";
     doc.body.appendChild(stage);
-    const component = new import_obsidian15.Component();
+    const component = new import_obsidian16.Component();
     component.load();
     try {
       for (let i = 0; i < files.length; i++) {
@@ -73272,7 +73411,7 @@ var AcademicNotes = class extends import_obsidian15.Plugin {
           if (typeof c === "string" && /^[A-Za-z_][A-Za-z0-9_-]*$/.test(c))
             section.classList.add(c);
         stage.appendChild(section);
-        await import_obsidian15.MarkdownRenderer.render(this.app, this.exportSource(note, graph2), section, f.path, component);
+        await import_obsidian16.MarkdownRenderer.render(this.app, this.exportSource(note, graph2), section, f.path, component);
         await Obs2.finishRenderMath();
         await waitForTikz(section, 6e4, () => this.active && !signal?.aborted);
         check();
@@ -73438,7 +73577,7 @@ var AcademicNotes = class extends import_obsidian15.Plugin {
         const src = img.closest(".image-embed")?.getAttribute("src") || img.getAttribute("data-src");
         const path = img.closest(".phb-chapter")?.dataset.path || "";
         const file = src && this.app.metadataCache.getFirstLinkpathDest(src, path);
-        if (!(file instanceof import_obsidian15.TFile))
+        if (!(file instanceof import_obsidian16.TFile))
           throw new Error(t("\u65E0\u6CD5\u5D4C\u5165\u56FE\u7247\uFF1A") + (src || url));
         const bytes = await this.app.vault.readBinary(file);
         const mime = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", svg: "image/svg+xml", webp: "image/webp", gif: "image/gif" }[file.extension];
@@ -73523,21 +73662,21 @@ var AcademicNotes = class extends import_obsidian15.Plugin {
     const write = this.layoutWrite.catch(() => {
     }).then(async () => {
       const existing = this.app.vault.getAbstractFileByPath(path);
-      if (existing && !(existing instanceof import_obsidian15.TFile)) throw new Error(t("\u8BCA\u65AD\u8DEF\u5F84\u88AB\u6587\u4EF6\u5939\u5360\u7528\u3002"));
-      const file = existing instanceof import_obsidian15.TFile ? existing : await this.app.vault.create(path, content);
+      if (existing && !(existing instanceof import_obsidian16.TFile)) throw new Error(t("\u8BCA\u65AD\u8DEF\u5F84\u88AB\u6587\u4EF6\u5939\u5360\u7528\u3002"));
+      const file = existing instanceof import_obsidian16.TFile ? existing : await this.app.vault.create(path, content);
       if (existing) await this.app.vault.modify(file, content);
       if (await this.app.vault.read(file) !== content) throw new Error(t("\u8BCA\u65AD\u6587\u4EF6\u5199\u5165\u540E\u6821\u9A8C\u5931\u8D25\u3002"));
     });
     this.layoutWrite = write;
     return write;
   }
-  async startLayoutDiagnostics(view = this.app.workspace.getActiveViewOfType(import_obsidian15.MarkdownView)) {
+  async startLayoutDiagnostics(view = this.app.workspace.getActiveViewOfType(import_obsidian16.MarkdownView)) {
     if (this.layoutDiagnostics?.running) {
-      new import_obsidian15.Notice(t("\u6392\u7248\u8BCA\u65AD\u6B63\u5728\u8BB0\u5F55\u3002"));
+      new import_obsidian16.Notice(t("\u6392\u7248\u8BCA\u65AD\u6B63\u5728\u8BB0\u5F55\u3002"));
       return;
     }
     if (!view) {
-      new import_obsidian15.Notice(t("\u8BF7\u5148\u6253\u5F00\u9700\u8981\u68C0\u67E5\u7684\u7B14\u8BB0\u3002"));
+      new import_obsidian16.Notice(t("\u8BF7\u5148\u6253\u5F00\u9700\u8981\u68C0\u67E5\u7684\u7B14\u8BB0\u3002"));
       return;
     }
     const folder = safeFolder(this.settings.exportFolder);
@@ -73562,7 +73701,7 @@ var AcademicNotes = class extends import_obsidian15.Plugin {
       },
       onFinish: (report) => {
         void this.saveLayoutDiagnostics(report, path).then(() => {
-          if (this.active) new import_obsidian15.Notice(t("\u6392\u7248\u8BCA\u65AD\u5DF2\u4FDD\u5B58\uFF1A") + path, 15e3);
+          if (this.active) new import_obsidian16.Notice(t("\u6392\u7248\u8BCA\u65AD\u5DF2\u4FDD\u5B58\uFF1A") + path, 15e3);
         }).catch((e) => this.fail(t("\u6392\u7248\u4E0E\u6EDA\u52A8\u8BCA\u65AD"), e));
       }
     });
@@ -73574,18 +73713,18 @@ var AcademicNotes = class extends import_obsidian15.Plugin {
       recorder.stop();
       throw e;
     }
-    new import_obsidian15.Notice(t("\u5DF2\u5F00\u59CB\u8BB0\u5F55 90 \u79D2\uFF1B\u8BF7\u590D\u73B0\u65AD\u884C\u6216\u6ED1\u52A8\u5F02\u5E38\u3002\u6BCF 15 \u79D2\u4FDD\u5B58\uFF0C\u7ED3\u675F\u540E\u81EA\u52A8\u505C\u6B62\u3002") + "\n" + path, 14e3);
+    new import_obsidian16.Notice(t("\u5DF2\u5F00\u59CB\u8BB0\u5F55 90 \u79D2\uFF1B\u8BF7\u590D\u73B0\u65AD\u884C\u6216\u6ED1\u52A8\u5F02\u5E38\u3002\u6BCF 15 \u79D2\u4FDD\u5B58\uFF0C\u7ED3\u675F\u540E\u81EA\u52A8\u505C\u6B62\u3002") + "\n" + path, 14e3);
   }
   async stopLayoutDiagnostics() {
     if (!this.layoutDiagnostics || !this.layoutDiagnosticPath) {
-      new import_obsidian15.Notice(t("\u5C1A\u672A\u5F00\u59CB\u6392\u7248\u8BCA\u65AD\u3002"));
+      new import_obsidian16.Notice(t("\u5C1A\u672A\u5F00\u59CB\u6392\u7248\u8BCA\u65AD\u3002"));
       return;
     }
     await this.saveLayoutDiagnostics(this.layoutDiagnostics.stop(), this.layoutDiagnosticPath);
-    new import_obsidian15.Notice(t("\u6392\u7248\u8BCA\u65AD\u5DF2\u4FDD\u5B58\uFF1A") + this.layoutDiagnosticPath, 15e3);
+    new import_obsidian16.Notice(t("\u6392\u7248\u8BCA\u65AD\u5DF2\u4FDD\u5B58\uFF1A") + this.layoutDiagnosticPath, 15e3);
   }
   async diagnostics() {
-    const diagnosticView = this.app.workspace.getActiveViewOfType(import_obsidian15.MarkdownView);
+    const diagnosticView = this.app.workspace.getActiveViewOfType(import_obsidian16.MarkdownView);
     const result = {
       plugin: this.manifest.name,
       version: this.manifest.version,
@@ -73599,16 +73738,16 @@ var AcademicNotes = class extends import_obsidian15.Plugin {
       typography: diagnosticView ? visibleTypographyStatus(diagnosticView.containerEl, { reading: this.settings.kpReading, live: this.settings.kpLivePreview, paused: this.previewPaused }) : [],
       layoutDiagnostics: { running: !!this.layoutDiagnostics?.running, output: this.layoutDiagnosticPath || null }
     };
-    const modal = new import_obsidian15.Modal(this.app);
+    const modal = new import_obsidian16.Modal(this.app);
     modal.titleEl.setText(t("Academic Notes \u8BCA\u65AD"));
     modal.contentEl.createEl("p", { text: t("\u6392\u7248\u72B6\u6001\uFF1Aoptimized = KP \u5DF2\u751F\u6548\uFF1Bediting / selection = \u4FDD\u7559\u539F\u751F\u7F16\u8F91\u6216\u9009\u533A\uFF1Bunsupported-content / unsupported-style = \u5185\u5BB9\u6216\u6837\u5F0F\u4E0D\u652F\u6301\uFF1Blimit = \u8FBE\u5230\u5904\u7406\u4E0A\u9650\uFF1Bcannot-fit = \u65E0\u6CD5\u5B89\u5168\u6392\u6EE1\uFF1Bnot-run = \u5C1A\u672A\u5904\u7406\uFF1Bdisabled / paused = \u5DF2\u5173\u95ED\u6216\u4E34\u65F6\u6682\u505C\u3002") });
-    new import_obsidian15.Setting(modal.contentEl).setName(t("\u5B9E\u65F6\u9884\u89C8\u589E\u5F3A")).setDesc(t("\u9047\u5230\u7F16\u8F91\u6216\u6EDA\u52A8\u5F02\u5E38\u65F6\uFF0C\u53EF\u4E34\u65F6\u6682\u505C\u63D2\u4EF6\u7684\u7F16\u8F91\u89C6\u56FE\u589E\u5F3A\uFF1B\u4E0D\u4FEE\u6539\u5DF2\u4FDD\u5B58\u7684\u8BBE\u7F6E\u3002")).addButton((b) => b.setButtonText(t(this.previewPaused ? "\u6062\u590D\u589E\u5F3A" : "\u4E34\u65F6\u6682\u505C")).onClick(() => {
+    new import_obsidian16.Setting(modal.contentEl).setName(t("\u5B9E\u65F6\u9884\u89C8\u589E\u5F3A")).setDesc(t("\u9047\u5230\u7F16\u8F91\u6216\u6EDA\u52A8\u5F02\u5E38\u65F6\uFF0C\u53EF\u4E34\u65F6\u6682\u505C\u63D2\u4EF6\u7684\u7F16\u8F91\u89C6\u56FE\u589E\u5F3A\uFF1B\u4E0D\u4FEE\u6539\u5DF2\u4FDD\u5B58\u7684\u8BBE\u7F6E\u3002")).addButton((b) => b.setButtonText(t(this.previewPaused ? "\u6062\u590D\u589E\u5F3A" : "\u4E34\u65F6\u6682\u505C")).onClick(() => {
       this.togglePreviewPause();
       modal.close();
     }));
     const pre = modal.contentEl.createEl("pre", { text: JSON.stringify(result, null, 2) });
     pre.classList.add("an-diagnostics");
-    new import_obsidian15.Setting(modal.contentEl).setName(t("\u6392\u7248\u4E0E\u6EDA\u52A8\u8BCA\u65AD")).setDesc(t("\u4EC5\u8BB0\u5F55\u5C3A\u5BF8\u3001\u6837\u5F0F\u548C\u4E8B\u4EF6\u8BA1\u6570\uFF0C\u4E0D\u8BB0\u5F55\u7B14\u8BB0\u6587\u5B57\u3001\u516C\u5F0F\u6E90\u7801\u6216\u6587\u4EF6\u540D\u300290 \u79D2\u540E\u81EA\u52A8\u505C\u6B62\uFF0C\u6BCF 15 \u79D2\u4FDD\u5B58\u5230\u5E93\u5185\u5BFC\u51FA\u76EE\u5F55\u3002")).addButton((b) => b.setButtonText(t("\u5F00\u59CB\u8BB0\u5F55")).onClick(() => {
+    new import_obsidian16.Setting(modal.contentEl).setName(t("\u6392\u7248\u4E0E\u6EDA\u52A8\u8BCA\u65AD")).setDesc(t("\u4EC5\u8BB0\u5F55\u5C3A\u5BF8\u3001\u6837\u5F0F\u548C\u4E8B\u4EF6\u8BA1\u6570\uFF0C\u4E0D\u8BB0\u5F55\u7B14\u8BB0\u6587\u5B57\u3001\u516C\u5F0F\u6E90\u7801\u6216\u6587\u4EF6\u540D\u300290 \u79D2\u540E\u81EA\u52A8\u505C\u6B62\uFF0C\u6BCF 15 \u79D2\u4FDD\u5B58\u5230\u5E93\u5185\u5BFC\u51FA\u76EE\u5F55\u3002")).addButton((b) => b.setButtonText(t("\u5F00\u59CB\u8BB0\u5F55")).onClick(() => {
       modal.close();
       void this.startLayoutDiagnostics(diagnosticView).catch((e) => this.fail(t("\u6392\u7248\u4E0E\u6EDA\u52A8\u8BCA\u65AD"), e));
     })).addButton((b) => b.setButtonText(t("\u505C\u6B62\u5E76\u4FDD\u5B58")).onClick(() => {
@@ -73617,19 +73756,19 @@ var AcademicNotes = class extends import_obsidian15.Plugin {
     })).addButton((b) => b.setButtonText(t("\u67E5\u770B\u8BB0\u5F55")).onClick(() => {
       const report = this.layoutDiagnostics?.report() || this.layoutReport;
       if (!report) {
-        new import_obsidian15.Notice(t("\u5C1A\u672A\u5F00\u59CB\u6392\u7248\u8BCA\u65AD\u3002"));
+        new import_obsidian16.Notice(t("\u5C1A\u672A\u5F00\u59CB\u6392\u7248\u8BCA\u65AD\u3002"));
         return;
       }
-      const viewer = new import_obsidian15.Modal(this.app);
+      const viewer = new import_obsidian16.Modal(this.app);
       viewer.titleEl.setText(t("\u6392\u7248\u4E0E\u6EDA\u52A8\u8BCA\u65AD"));
       viewer.contentEl.createEl("p", { text: this.layoutDiagnosticPath || "" });
       viewer.contentEl.createEl("pre", { cls: "an-diagnostics", text: JSON.stringify(report, null, 2) });
-      new import_obsidian15.Setting(viewer.contentEl).addButton((control) => control.setButtonText(t("\u6253\u5F00\u5DF2\u4FDD\u5B58\u62A5\u544A")).onClick(async () => {
+      new import_obsidian16.Setting(viewer.contentEl).addButton((control) => control.setButtonText(t("\u6253\u5F00\u5DF2\u4FDD\u5B58\u62A5\u544A")).onClick(async () => {
         try {
           if (this.layoutDiagnostics?.running) await this.stopLayoutDiagnostics();
           await this.layoutWrite;
           const file = this.layoutDiagnosticPath && this.app.vault.getAbstractFileByPath(this.layoutDiagnosticPath);
-          if (!(file instanceof import_obsidian15.TFile)) throw new Error(t("\u8BCA\u65AD\u6587\u4EF6\u5C1A\u672A\u4FDD\u5B58\uFF0C\u8BF7\u67E5\u770B\u8BCA\u65AD\u9519\u8BEF\u3002"));
+          if (!(file instanceof import_obsidian16.TFile)) throw new Error(t("\u8BCA\u65AD\u6587\u4EF6\u5C1A\u672A\u4FDD\u5B58\uFF0C\u8BF7\u67E5\u770B\u8BCA\u65AD\u9519\u8BEF\u3002"));
           modal.close();
           viewer.close();
           await this.app.workspace.getLeaf(false).openFile(file);
@@ -73639,13 +73778,13 @@ var AcademicNotes = class extends import_obsidian15.Plugin {
       }));
       viewer.open();
     }));
-    new import_obsidian15.Setting(modal.contentEl).addButton((b) => b.setButtonText(t("\u4FDD\u5B58\u8BCA\u65AD JSON \u5230\u5BFC\u51FA\u76EE\u5F55")).onClick(async () => {
+    new import_obsidian16.Setting(modal.contentEl).addButton((b) => b.setButtonText(t("\u4FDD\u5B58\u8BCA\u65AD JSON \u5230\u5BFC\u51FA\u76EE\u5F55")).onClick(async () => {
       try {
         const folder = safeFolder(this.settings.exportFolder);
         await this.mkdir(folder);
         const path = folder + "/academic-diagnostics-" + Date.now() + ".json";
         await this.app.vault.adapter.write(path, JSON.stringify(result, null, 2));
-        new import_obsidian15.Notice(t("\u5DF2\u4FDD\u5B58 ") + path);
+        new import_obsidian16.Notice(t("\u5DF2\u4FDD\u5B58 ") + path);
       } catch (e) {
         this.fail(t("\u4FDD\u5B58\u8BCA\u65AD"), e);
       }

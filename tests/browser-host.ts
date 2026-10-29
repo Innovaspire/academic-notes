@@ -45,6 +45,29 @@ export class Modal {
   onClose() {}
   close() { this.modalEl.remove(); this.onClose(); }
 }
+export class SuggestModal<T> extends Modal {
+  inputEl = this.modalEl.createEl('input');
+  resultContainerEl = this.modalEl.createDiv({cls:'suggestion-container'});
+  limit = 100;
+  setPlaceholder(text:string) { this.inputEl.placeholder=text; }
+  setInstructions(_instructions:unknown[]) {}
+  getSuggestions(_query:string):T[] { return []; }
+  renderSuggestion(_item:T,_el:HTMLElement) {}
+  onChooseSuggestion(_item:T) {}
+  selectSuggestion(item:T) { this.close();this.onChooseSuggestion(item); }
+  onOpen() {
+    let items:T[]=[],active=0;
+    const refresh=()=>{items=this.getSuggestions(this.inputEl.value).slice(0,this.limit);active=0;this.resultContainerEl.empty();
+      for(const item of items){const row=this.resultContainerEl.createDiv({cls:'suggestion-item'});this.renderSuggestion(item,row);row.addEventListener('click',()=>this.selectSuggestion(item));}};
+    this.inputEl.addEventListener('input',refresh);
+    this.inputEl.addEventListener('keydown',event=>{
+      if(event.key==='Escape'){event.preventDefault();this.close();}
+      if(event.key==='ArrowDown'){event.preventDefault();active=Math.min(active+1,items.length-1);}
+      if(event.key==='Enter'&&items[active]){event.preventDefault();this.selectSuggestion(items[active]);}
+    });
+    refresh();this.inputEl.focus();
+  }
+}
 export class Setting {
   settingEl: HTMLElement; nameEl: HTMLElement; descEl: HTMLElement;
   constructor(parent: HTMLElement) {

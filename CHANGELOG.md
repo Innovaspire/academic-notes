@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Integrate Innovaspire's grouped reference suggestions from PR #3, retaining the original contribution. Browse by folder or file and jump to the current note.
+- Keep navigation and filtering inside a native reference browser without editing the source query; distinguish same-name folders/files and reject insertion into changed or switched notes.
+- Preserve inline/display LaTeX insertion, row labels, duplicate-label checks and ordinary prose links. Parse callout title IDs directly so unsaved edits do not depend on cached positions.
+- Add optional manual-number-first ordering (off by default); exact label matches retain priority.
+
 ## 2.15.5 — 2026-10-26
 
 - Add a build/deploy command that installs only the three plugin assets, backs up previous assets outside the vault and optionally reloads the target vault through Obsidian CLI.

@@ -75,7 +75,7 @@ Installation, syntax, settings, and examples live in the **[Wiki](https://github
 
 ## Contributors
 
-Thanks to [Innovaspire](https://github.com/Innovaspire) for contributing LaTeX equation references and per-row numbering in [PR #2](https://github.com/Kristal-Boltinn/academic-notes/pull/2).
+Thanks to [Innovaspire](https://github.com/Innovaspire) for contributing LaTeX equation references and per-row numbering in [PR #2](https://github.com/Kristal-Boltinn/academic-notes/pull/2), and grouped reference suggestions in [PR #3](https://github.com/Kristal-Boltinn/academic-notes/pull/3).
 
 ## Support and feedback
 

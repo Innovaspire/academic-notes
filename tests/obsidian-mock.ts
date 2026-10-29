@@ -17,14 +17,16 @@ export class Plugin {
 }
 export const apiVersion = 'test';
 export class PluginSettingTab { constructor(public app: any, public plugin: any) {} }
-export class Modal { constructor(public app: any) {} }
+export class Modal { constructor(public app: any) {} close() {} open() {} }
 export class FuzzySuggestModal extends Modal {}
-export class EditorSuggest extends Modal {}
+export class SuggestModal<T> extends Modal { setPlaceholder(_text: string) {} setInstructions(_instructions: any[]) {} }
+export class EditorSuggest extends Modal { setInstructions(_instructions: any[]) {} }
 export class MarkdownRenderChild {}
 export class MarkdownView {}
 export class Component {}
 export class TFile {}
 export class Notice {}
+export const setIcon = () => {};
 export class MockElement {
   dataset: Record<string,string> = {};
   style = { setProperty() {} };

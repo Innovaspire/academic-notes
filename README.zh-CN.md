@@ -75,7 +75,7 @@ Beta 功能有明确的适用范围，排版与触屏表现也可能受到设备
 
 ## 贡献者
 
-感谢 [Innovaspire](https://github.com/Innovaspire) 在 [PR #2](https://github.com/Kristal-Boltinn/academic-notes/pull/2) 中贡献 LaTeX 公式引用和逐行编号功能。
+感谢 [Innovaspire](https://github.com/Innovaspire) 在 [PR #2](https://github.com/Kristal-Boltinn/academic-notes/pull/2) 中贡献 LaTeX 公式引用和逐行编号功能，以及在 [PR #3](https://github.com/Kristal-Boltinn/academic-notes/pull/3) 中贡献分组引用候选。
 
 ## 支持与反馈
 

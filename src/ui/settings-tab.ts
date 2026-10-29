@@ -252,6 +252,7 @@ class AcademicSettings extends PluginSettingTab {
         select('sectionNumberSource', t("H2 节号来源"), { order: t("按 H2 出现顺序：1、2、3"), heading: t("优先使用标题开头的数字") }, t("只读源码中的 H2，不计 H3、H6 或代码块里的标题。"));
         toggle('maintainReferencePaths', t('改名时维护学术引用'), t('笔记或文件夹改名后更新 LaTeX 引用和合订本章节路径。'));
         toggle('referencePreview', t('引用内容预览'), t('桌面悬停或聚焦显示预览，移动端点按后选择跳转。'));
+        toggle('referenceManualFirst', t('引用候选优先显示手动编号'), t('默认按文件和正文顺序排列；开启后优先显示手动编号对象，精确标签匹配始终优先。'));
         toggle('shortReferences', t("链接引用使用缩写"), t("标题仍为 Theorem / Definition；链接显示 thm 2.1 / def 2.1。"));
         toggle('mediaNumbered', t("图、表和子图自动编号"), t("用 [!figure] / [!table]；嵌套 [!subfigure] 得到 (a)、(b)。安装后即可使用内置图表样式。"));
         toggle('sharedCounter', t("不同定理类型共享计数器"), t("关闭时 Definition、Theorem 等各自计数。公式始终独立。"));

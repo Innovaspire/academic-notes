@@ -1,0 +1,42 @@
+import { MarkdownView, TFile, Platform } from 'obsidian';
+import AcademicNotes from '../src/main';
+import Engine from '../src/indexing/engine';
+import { DEFAULTS } from '../src/settings';
+import { ReferenceSuggest } from '../src/ui/reference-suggest';
+const check=(value:unknown,message:string)=>{if(!value)throw new Error(message);};
+const wait=()=>new Promise(resolve=>setTimeout(resolve,20));
+export async function runSuggestionBrowserRegressions() {
+    const files=new Map<string,TFile>(),texts=new Map<string,string>();
+    const add=(path:string,text:string)=>{const f=Object.assign(new TFile(),{path});files.set(path,f);texts.set(path,text);return f;};
+    add('foo.md',String.raw`$$x=1 \label{root}$$`);add('foo/child.md',String.raw`$$y=2 \label{child}$$`);
+    add('unlabelled.md','$$a=b$$');
+    const original=String.raw`By $\eqref{}$, we conclude.`,file=add('active.md',original),other=add('other.md',original);
+    let buffer=original,writes=0,targetWrites=0;const errors:unknown[]=[];
+    const editor:any={getValue:()=>buffer,getLine:()=>buffer,getRange:(a:any,b:any)=>buffer.slice(a.ch,b.ch),posToOffset:(p:any)=>p.ch,offsetToPos:(n:number)=>({line:0,ch:n}),
+        replaceRange:(text:string,a:any,b:any)=>{buffer=buffer.slice(0,a.ch)+text+buffer.slice(b.ch);writes++;}};
+    const view=Object.assign(new MarkdownView(),{file,editor,getMode:()=> 'source'});
+    const plugin=new AcademicNotes({workspace:{getLeavesOfType:()=>[{view}]},vault:{getAbstractFileByPath:(p:string)=>files.get(p),process:async(f:TFile,fn:(s:string)=>string)=>{targetWrites++;texts.set(f.path,fn(texts.get(f.path)!));}}} as any,{} as any);
+    plugin.settings={...DEFAULTS};plugin.scheduleIndex=()=>{};plugin.fail=(_where,error)=>{errors.push(error);};
+    plugin.graph=Engine.graph([...texts].map(([path,s])=>Engine.parse(path,s)),plugin.settings);
+    const suggest:any=new ReferenceSuggest(plugin);
+    const open=async(path:string,type='file')=>{const ctx=suggest.onTrigger({line:0,ch:buffer.indexOf('}')},editor,file);suggest.context={...ctx,editor,file};
+        const entry=suggest.getSuggestions(suggest.context).find((x:any)=>x.type===type&&x.path===path);check(entry,'Missing navigation entry '+path);suggest.selectSuggestion(entry);
+        await wait();const modal=document.querySelector<HTMLElement>('.an-reference-browser')!;check(modal,'Reference browser should open');return modal;};
+    const click=(modal:HTMLElement,selector:string,text:string)=>{const target=[...modal.querySelectorAll<HTMLElement>(selector)].find(x=>x.textContent?.includes(text));check(target,'Missing '+text);target!.click();};
+    const key=(modal:HTMLElement,key:string)=>modal.querySelector('input')!.dispatchEvent(new KeyboardEvent('keydown',{key,bubbles:true,cancelable:true}));
+    const mobile=Platform.isMobile;Object.assign(Platform,{isMobile:true});
+    const modal=await open('foo','folder');click(modal,'.suggestion-item','child.md');
+    check(modal.textContent?.includes('^child'),'Folder selection must show child targets');
+    const input=modal.querySelector('input')!;input.value='chi';input.dispatchEvent(new Event('input',{bubbles:true}));
+    click(modal,'button','Back');check(modal.textContent?.includes('child.md'),'Back must return to the parent folder');
+    check(buffer===original&&writes===0&&targetWrites===0,'Browsing, searching and returning must not edit source or undo history');
+    key(modal,'Escape');check(!document.querySelector('.an-reference-browser')&&buffer===original,'Escape must dismiss without touching the note');
+    Object.assign(Platform,{isMobile:mobile});
+    const fileModal=await open('foo.md');check(fileModal.textContent?.includes('^root')&&!fileModal.textContent?.includes('^child'),'A same-name note must remain distinct from its folder');
+    key(fileModal,'Enter');await wait();check(buffer===String.raw`By $\eqref{foo#^root}$, we conclude.`&&writes===1,'Keyboard selection must replace only the original inline reference');
+    buffer=original;const changed=await open('unlabelled.md');buffer+=' New edit';const beforeWrites=targetWrites;key(changed,'Enter');await wait();
+    check(errors.length===1&&targetWrites===beforeWrites&&buffer.endsWith('New edit'),'Changed origins must be rejected before adding a target ID');
+    buffer=original;const switched=await open('foo.md');view.file=other;key(switched,'Enter');await wait();check(errors.length===2&&buffer===original,'An identical-text note switch must not receive the insertion');
+    view.file=file;const failed=await open('foo.md');texts.set('foo.md','Replaced target');key(failed,'Enter');await wait();
+    check(errors.length===3&&buffer===original,'Insertion failure must leave the original query, with no navigation path');
+}

@@ -5,6 +5,7 @@ import { setMathOutput } from './browser-host';
 import { renderFragment } from '../src/rendering/adapters';
 import { ReferencePreviews } from '../src/ui/reference-preview';
 import { setLanguage } from '../src/i18n';
+import { runSuggestionBrowserRegressions } from './suggestions-browser';
 const check=(value:unknown,message:string)=>{if(!value)throw new Error(message);};
 const wait=()=>new Promise(resolve=>setTimeout(resolve,320));
 export async function runReferenceWorkflowRegressions(){
@@ -42,5 +43,5 @@ First $x+1$ then $\eqref{eq:a}$.`;
   check(opened===1,'Preview open action must navigate exactly once');
   Object.assign(Platform,{isMobile:originalMobile});previews.destroy();cleanup.reverse().forEach(fn=>fn());host.remove();
  }
- setMathOutput('svg');return 'Inline CHTML/SVG references, stable rerenders, desktop hover, keyboard dismissal, mobile preview and incoming references passed';
+ setMathOutput('svg');await runSuggestionBrowserRegressions();return 'Inline CHTML/SVG references, stable rerenders, previews and source-preserving suggestion browsing passed';
 }
