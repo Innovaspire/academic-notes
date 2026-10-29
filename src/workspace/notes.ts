@@ -38,7 +38,13 @@ export function labelInsertion(source: string, record: SourceRecord, settings: P
     let id: string;
     do { id = 'an-' + Math.random().toString(36).slice(2, 10); } while (note.anchors?.has(id) || note.blocks.has(id));
     const prefix = record.kind === 'equation' || record.diagram ? Engine.quote(note.lines[record.endLine]).prefix : record.depth > 1 ? '> '.repeat(record.depth - 1) : '';
-    return { id, at: note.starts[record.endLine] + note.lines[record.endLine].length, text: '\n' + prefix + '\n' + prefix + '^' + id + '\n' };
+    const at = note.starts[record.endLine] + note.lines[record.endLine].length;
+    // Keep the parent blockquote open when further quoted content follows. An
+    // unquoted blank line would close an enclosing callout early and move the
+    // rest of the note outside it, so the separator stays at the parent depth.
+    const next = source.slice(at).replace(/^\r?\n/, '').split('\n')[0];
+    const trailing = prefix && Engine.quote(next).depth > 0 ? '\n' + prefix : '\n';
+    return { id, at, text: '\n' + prefix + '\n' + prefix + '^' + id + trailing };
 }
 export function currentRecord(source: string, original: string, record: SourceRecord, settings: Parameters<typeof Engine.parse>[3]) {
     const note = Engine.parse(record.path, source, {}, settings), text = original.slice(record.from, record.to);

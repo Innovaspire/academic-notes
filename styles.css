@@ -1329,6 +1329,19 @@ body .markdown-source-view.mod-cm6 .callout:is([data-callout=figure], [data-call
 .an-reference-preview h3 {
   margin: 0 0 8px;
 }
+.an-reference-preview .an-reference-callout.callout {
+  margin: 8px 0 12px !important;
+  padding: 0 1em .8em !important;
+}
+.an-reference-preview .an-reference-callout > .callout-title {
+  margin: -.75em 0 .45em .25em !important;
+}
+.an-reference-preview .an-reference-callout > .callout-content.an-reference-excerpt {
+  max-height: 32vh;
+  overflow: auto !important;
+  white-space: pre-wrap;
+  margin-block: 0;
+}
 .an-reference-location {
   font-size: var(--font-ui-small);
   color: var(--text-muted);

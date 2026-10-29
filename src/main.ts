@@ -1,4 +1,5 @@
 import { ReferencePreviews } from './ui/reference-preview';
+import { patchNativeBlocks, restoreNativeBlocks, type NativeBlockSave } from './indexing/native-blocks';
 import { maintainRenamedPaths } from './workspace/refactor';
 import { RenameReferencePicker } from './ui/rename-reference';
 import { prepareMathLinks } from './export/math-links';
@@ -73,6 +74,8 @@ export default class AcademicNotes extends Plugin {
     readerUnloads = new Set<() => void>();
     paragraphLayouts = new Set<ReturnType<typeof createParagraphLayoutController>>();
     parsed = new Map<string, ParsedNote>();
+    nativeBlockSaves = new Map<string, NativeBlockSave>();
+    private refreshRetries = new Map<EditorView, { revision: number; timer: number }>();
     dirty = new Map<string, true>();
     pdfJobs = new Set<AbortController>();
     themeObserver: MutationObserver;
@@ -98,6 +101,8 @@ export default class AcademicNotes extends Plugin {
         this.readerUnloads = new Set();
         this.paragraphLayouts = new Set();
         this.parsed = new Map();
+        this.nativeBlockSaves = new Map();
+        this.refreshRetries = new Map();
         this.dirty = new Map();
         this.pdfJobs = new Set();
         try {
@@ -195,6 +200,9 @@ export default class AcademicNotes extends Plugin {
     }
     onunload() {
         this.active = false;
+        for (const pending of this.refreshRetries.values()) window.clearTimeout(pending.timer);
+        this.refreshRetries.clear();
+        for (const path of [...this.nativeBlockSaves.keys()]) this.restoreNativeBlockSave(path);
         if (this.layoutDiagnostics?.running && this.layoutDiagnosticPath) {
             void this.saveLayoutDiagnostics(this.layoutDiagnostics.stop(), this.layoutDiagnosticPath).catch(() => {});
         }
@@ -230,8 +238,32 @@ export default class AcademicNotes extends Plugin {
     async saveSettings() { await this.saveData(this.settings); this.applyAppearance(); for (const layout of this.paragraphLayouts) layout.refresh(); this.scheduleIndex(); }
     togglePreviewPause() {
         this.previewPaused = !this.previewPaused;
-        for (const view of this.editorViews) { try { view.dispatch({ effects: this.refreshEffect.of(++this.revision) }); } catch (error) { this.recordError(t('刷新编辑器'), error); } }
+        for (const view of this.editorViews) this.refreshEditor(view, ++this.revision);
         new Notice(t(this.previewPaused ? '已暂停本次会话的实时预览增强；阅读与导出不受影响。' : '已恢复实时预览增强。'));
+    }
+    /** Never dispatch while an IME composition is active: the host commits it on compositionend. */
+    refreshEditor(view: EditorView, revision: number) {
+        if (!this.active) return;
+        const pending = this.refreshRetries.get(view);
+        if (pending) { pending.revision = revision; return; }
+        const run = () => {
+            if (!this.active || !this.editorViews.has(view)) return;
+            try { view.dispatch({ effects: this.refreshEffect.of(revision) }); }
+            catch (error) { this.recordError(t('刷新编辑器'), error); }
+        };
+        if (!view.composing && !view.compositionStarted) { run(); return; }
+        // A composition can last for seconds. Keep one retry chain per editor
+        // instead of dropping the refresh after a single 50 ms attempt.
+        const entry = { revision, timer: 0 };
+        const step = () => {
+            if (!this.active || !this.editorViews.has(view)) { this.refreshRetries.delete(view); return; }
+            if (view.composing || view.compositionStarted) { entry.timer = window.setTimeout(step, 50); return; }
+            this.refreshRetries.delete(view);
+            try { view.dispatch({ effects: this.refreshEffect.of(entry.revision) }); }
+            catch (error) { this.recordError(t('刷新编辑器'), error); }
+        };
+        entry.timer = window.setTimeout(step, 50);
+        this.refreshRetries.set(view, entry);
     }
     applyAppearance() {
         if (!this.active)
@@ -307,9 +339,10 @@ export default class AcademicNotes extends Plugin {
             if (!this.active)
                 return;
             const paths = new Set(files.map(f => f.path));
-            for (const p of this.parsed.keys())
-                if (!paths.has(p)) { this.parsed.delete(p); changed = true; this.renderStates.delete(p); }
+            for (const p of [...this.parsed.keys()])
+                if (!paths.has(p)) { this.parsed.delete(p); changed = true; this.renderStates.delete(p); this.restoreNativeBlockSave(p); }
             if (changed) { this.graph = Engine.graph(notes, this.settings, (n, h) => this.resolver(n, h)); metrics.graphRebuilt = true; }
+            for (const note of notes) this.patchNoteBlocks(note);
             const affected = new Set<string>(), allViews = renderKey !== this.renderKey;
             for (const note of notes) {
                 const labels = JSON.stringify([
@@ -338,12 +371,7 @@ export default class AcademicNotes extends Plugin {
             for (const view of this.editorViews) {
                 const path = view.state.field(Obs.editorInfoField, false)?.file?.path;
                 if (path && !affected.has(path)) continue;
-                try {
-                    view.dispatch({ effects: this.refreshEffect.of(this.revision) });
-                }
-                catch (e) {
-                    this.recordError(t("刷新编辑器"), e);
-                }
+                this.refreshEditor(view, this.revision);
             }
             metrics.durationMs = Math.round(performance.now() - started); this.indexMetrics = metrics;
         })();
@@ -357,6 +385,59 @@ export default class AcademicNotes extends Plugin {
                 this.scheduleIndex();
             }
         }
+    }
+    /**
+     * Obsidian's metadata cache attaches an ID in a callout to the outermost
+     * callout, and omits IDs on callout title lines and standalone quoted lines.
+     * Align its block positions with our records so Page preview and native block
+     * navigation show the lemma/equation instead of the enclosing theorem.
+     */
+    patchNoteBlocks(note: ParsedNote) {
+        const file = this.app.vault.getAbstractFileByPath(note.path);
+        if (!(file instanceof TFile))
+            return;
+        const cache = this.app.metadataCache.getFileCache(file);
+        if (!cache)
+            return;
+        let save = this.nativeBlockSaves.get(note.path);
+        const hasRecords = [...note.blocks.values()].some(Boolean);
+        // Unchanged notes are by far the common case in large vaults; only the
+        // first parse or a real cache/file change needs the per-ID walk.
+        if (hasRecords && note._blocks !== undefined && save && save.cache === cache && save.blocks === cache.blocks && save.patched === note._blocks && note._nativePatched === note._blocks)
+            return;
+        if (!hasRecords && !save) {
+            note._nativePatched = note._blocks;
+            return;
+        }
+        // A metadata wrapper may be replaced while keeping the same blocks map;
+        // keep the original positions in that case. A new map is a new host state.
+        if (save && save.cache !== cache) {
+            if (save.blocks === cache.blocks) save.cache = cache;
+            else save = undefined;
+        }
+        if (!save || save.blocks !== cache.blocks) {
+            save = { cache, blocks: cache.blocks, entries: new Map() };
+            this.nativeBlockSaves.set(note.path, save);
+        }
+        if (hasRecords && note._blocks !== undefined && save.patched === note._blocks && note._nativePatched === note._blocks)
+            return;
+        try {
+            if (patchNativeBlocks(cache, note, save))
+                note._blocks = JSON.stringify(cache.blocks || {});
+            save.patched = note._blocks;
+            note._nativePatched = note._blocks;
+            if (!save.entries.size)
+                this.nativeBlockSaves.delete(note.path);
+        }
+        catch (error) { this.recordError(t('修正原生块位置'), error); }
+    }
+    private restoreNativeBlockSave(path: string) {
+        const save = this.nativeBlockSaves.get(path);
+        if (!save)
+            return;
+        this.nativeBlockSaves.delete(path);
+        try { restoreNativeBlocks(save); }
+        catch (error) { this.recordError(t('恢复原生块位置'), error); }
     }
     postprocess(el: HTMLElement, ctx: MarkdownPostProcessorContext) {
         if (el.closest('.phb-export-stage') || editorFragment(el))

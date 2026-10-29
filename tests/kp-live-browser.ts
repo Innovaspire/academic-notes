@@ -74,6 +74,11 @@ export async function runKpLiveRegressions() {
         check(breaks() === 0, 'cross-paragraph selection must immediately restore all selected prose');
         view.dispatch({ selection: { anchor: 0 } }); await settle();
         view.contentDOM.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+        // The plugin must not dispatch from the DOM event itself: CodeMirror may
+        // not have committed the composed text yet, and a synchronous transaction
+        // drops it on Windows IMEs.
+        check(breaks() > 2, 'compositionstart must not dispatch synchronously');
+        await settle();
         check(breaks() === 0, 'composition must restore native layout');
         view.contentDOM.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true })); await settle();
         check(breaks() > 2, 'layout must resume after composition');
