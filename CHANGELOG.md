@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.15.6 — 2026-10-29
 
 - Integrate Innovaspire's grouped reference suggestions from PR #3, retaining the original contribution. Browse by folder or file and jump to the current note.
 - Keep navigation and filtering inside a native reference browser without editing the source query; distinguish same-name folders/files and reject insertion into changed or switched notes.

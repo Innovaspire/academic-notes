@@ -14,7 +14,7 @@ Inspired by [ElegantBook](https://github.com/ElegantLaTeX/ElegantBook), Academic
 
 - **Mathematical environments** — theorems, definitions, lemmas, propositions, proofs, remarks, and more, with support for folding and nesting.
 - **Flexible numbering** — automatic or manual numbers, section-based or continuous counters, shared theorem counters, and an option to number only referenced equations.
-- **Cross-file references** — readable labels, reference suggestions that can label new targets, customizable names and abbreviations, and links that follow their targets into a PDF book.
+- **Cross-file references** — file-grouped suggestions with a current-note shortcut, safe labelling of new targets, customizable names and abbreviations, and links that follow their targets into a PDF book.
 - **Your own environments** — add named environments with their own numbering, references, colors, and corner motifs; inspect usage or retire them from insertion.
 
 [Explore mathematical environments](https://github.com/Kristal-Boltinn/academic-notes/wiki/Mathematical-environments) · [References and indexes](https://github.com/Kristal-Boltinn/academic-notes/wiki/References-and-indexes)
