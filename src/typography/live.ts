@@ -96,6 +96,10 @@ function planParagraph(text: string, offset: number, width: number, context: Can
 /** All editable nodes remain owned by CodeMirror; layout never changes document text. */
 export function createLiveParagraphExtension(plugin: AcademicNotes) {
     const enabled = (state: EditorState) => plugin.settings.kpLivePreview && !plugin.previewPaused && !!state.field(editorLivePreviewField, false);
+    // IME composition must never be interrupted by a synchronous transaction.
+    // CodeMirror's own composition handlers may be registered after this plugin's
+    // during editor creation, so any dispatch from these DOM callbacks is deferred
+    // to a macrotask, after the host has committed the composed text.
     const decorate = (state: EditorState, prose: ReturnType<typeof proseLines>, plans: Plan[], isComposing: boolean) => {
         const ranges = enabled(state) && !isComposing ? plans.filter(plan => !active(state, plan)).flatMap(plan => plan.decorations) : [];
         if (!plugin.previewPaused && (enabled(state) || plugin.settings.paragraphIndent) && state.field(editorLivePreviewField, false))
@@ -114,6 +118,7 @@ export function createLiveParagraphExtension(plugin: AcademicNotes) {
     });
     const worker = ViewPlugin.fromClass(class {
         destroyed = false; observer: ResizeObserver; theme: MutationObserver; idle: ReturnType<typeof editorIdleScheduler>;
+        composing = false; compositionPending = false;
         constructor(readonly view: EditorView) {
             this.idle = editorIdleScheduler(view.dom, () => this.requestLayout(), 90);
             this.observer = new ResizeObserver(() => this.schedule()); this.observer.observe(view.contentDOM);
@@ -126,8 +131,26 @@ export function createLiveParagraphExtension(plugin: AcademicNotes) {
             view.dom.ownerDocument.fonts?.addEventListener('loadingdone', this.fonts);
             this.schedule();
         }
-        start = () => { this.view.dispatch({ effects: composing.of(true) }); };
-        end = () => { this.view.dispatch({ effects: composing.of(false) }); this.schedule(); };
+        start = () => {
+            // No decoration can be present while both optional layouts are off.
+            if (this.destroyed || !this.decorated || this.compositionPending) return;
+            this.compositionPending = true;
+            this.view.dom.ownerDocument.win.setTimeout(() => {
+                if (this.destroyed || !this.compositionPending || this.composing) return;
+                this.composing = true;
+                this.view.dispatch({ effects: composing.of(true) });
+            }, 0);
+        };
+        end = () => {
+            if (this.destroyed || (!this.compositionPending && !this.composing)) return;
+            this.compositionPending = false;
+            this.view.dom.ownerDocument.win.setTimeout(() => {
+                if (this.destroyed || this.compositionPending) return;
+                if (this.composing) { this.composing = false; this.view.dispatch({ effects: composing.of(false) }); }
+                this.schedule();
+            }, 0);
+        };
+        get decorated() { return !!this.view.state.field(editorLivePreviewField, false) && !plugin.previewPaused && (plugin.settings.kpLivePreview || plugin.settings.paragraphIndent); }
         fonts = () => this.schedule();
         update(update: ViewUpdate) {
             if (update.docChanged || update.selectionSet || update.viewportChanged || update.transactions.some(tr => tr.effects.some(effect => effect.is(plugin.refreshEffect)))) this.schedule();
@@ -136,15 +159,17 @@ export function createLiveParagraphExtension(plugin: AcademicNotes) {
             this.idle.schedule();
         }
         requestLayout() {
-            if (this.destroyed) return;
+            if (this.destroyed || this.compositionPending || this.composing || this.view.composing || this.view.compositionStarted) return;
+            // Nothing to decorate: never dispatch a no-op transaction on idle.
+            if (plugin.previewPaused || !this.view.state.field(editorLivePreviewField, false) || !plugin.settings.kpLivePreview && !plugin.settings.paragraphIndent) return;
             this.view.requestMeasure({ key: this, read: view => ({ doc: view.state.doc, plans: this.measure(view) }), write: result => {
                 // requestMeasure writes run inside a view update. Dispatch only after it finishes,
-                // and discard positions if the source changed while measurements were pending.
-                queueMicrotask(() => { if (!this.destroyed && this.idle.isIdle() && this.view.state.doc === result.doc) this.view.dispatch({ effects: measured.of(result.plans) }); });
+                // discard positions if the source changed or an IME composition began meanwhile.
+                queueMicrotask(() => { if (!this.destroyed && this.idle.isIdle() && !this.compositionPending && !this.composing && !this.view.composing && !this.view.compositionStarted && this.view.state.doc === result.doc) this.view.dispatch({ effects: measured.of(result.plans) }); });
             } });
         }
         measure(view: EditorView) {
-            if (!enabled(view.state) || view.composing || view.state.field(field).composing) return [];
+            if (this.compositionPending || this.composing || !enabled(view.state) || view.composing || view.compositionStarted || view.state.field(field).composing) return [];
             const context = view.dom.ownerDocument.win.createEl('canvas').getContext('2d'); if (!context) return [];
             const plans: Plan[] = [];
             for (const row of view.contentDOM.querySelectorAll<HTMLElement>('.cm-line')) setParagraphStatus(row, 'unsupported-content');

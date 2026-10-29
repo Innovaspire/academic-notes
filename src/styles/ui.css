@@ -81,6 +81,9 @@
 
 .an-reference-popover { position:fixed; z-index:var(--layer-popover, 1000); width:min(440px, calc(100vw - 24px)); max-height:min(520px, 70vh); overflow:auto; padding:16px; border:1px solid var(--background-modifier-border); border-radius:var(--radius-m, 8px); background:var(--background-primary); color:var(--text-normal); box-shadow:var(--shadow-l); }
 .an-reference-preview h3 { margin:0 0 8px; }
+.an-reference-preview .an-reference-callout.callout { margin:8px 0 12px !important; padding:0 1em .8em !important; }
+.an-reference-preview .an-reference-callout > .callout-title { margin:-.75em 0 .45em .25em !important; }
+.an-reference-preview .an-reference-callout > .callout-content.an-reference-excerpt { max-height:32vh; overflow:auto !important; white-space:pre-wrap; margin-block:0; }
 .an-reference-location { font-size:var(--font-ui-small); color:var(--text-muted); overflow-wrap:anywhere; }
 .an-reference-excerpt { white-space:pre-wrap; overflow-wrap:anywhere; max-height:32vh; overflow:auto; margin-block:12px; }
 .an-reference-actions { display:flex; flex-wrap:wrap; gap:8px; margin-block:12px; }

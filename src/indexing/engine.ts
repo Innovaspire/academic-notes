@@ -83,6 +83,8 @@ export interface ParsedNote {
     _mtime?: number;
     _fromEditor?: boolean;
     _blocks?: string;
+    /** Cache JSON last aligned by the plugin; avoids re-walking unchanged notes. */
+    _nativePatched?: string;
 }
 const TYPES: Record<string, string[]> = {
     def: ['Definition', 'definition', 'def'], thm: ['Theorem', 'theorem', 'thm'],
@@ -279,11 +281,12 @@ function parse(path: string, source: string, cache: {
         const rawMeta = m[2] === undefined ? 'auto' : m[2].trim();
         const figure = key === 'figure' ? figureMetadata(rawMeta) : undefined;
         const meta = figure ? figure.numbering : rawMeta;
+        const title = (m[4] || '').trim().replace(/(?:^|[ \t])\^[A-Za-z0-9-]+[ \t]*$/, '').trim();
         const rec: SourceRecord = { kind: calloutCanon(m[1]) ? 'theorem' : key, key, rawType: m[1], path, line, endLine, from: starts[line],
-            to: starts[endLine] + lines[endLine].length, depth: q.depth, title: (m[4] || '').trim(),
+            to: starts[endLine] + lines[endLine].length, depth: q.depth, title,
             manual: meta && !['auto', '*', '-'].includes(meta) ? meta : null,
             suppress: meta === '' || meta === '*' || meta === '-', number: '', id: null, ids: [], layout: figure?.layout,
-            environment: custom[key], proofOwnLine: key === 'proof' && (!(m[4] || '').trim() || !quote(lines[line + 1] || '').body.trim()) };
+            environment: custom[key], proofOwnLine: key === 'proof' && (!title || !quote(lines[line + 1] || '').body.trim()) };
         (rec.kind === 'theorem' ? theorems : media).push(rec);
         callouts.push(rec);
         records.push(rec);
@@ -327,9 +330,25 @@ function parse(path: string, source: string, cache: {
             rec = candidates[0];
             if (!rec)
                 rec = callouts.filter(r => r.line < ln && r.endLine >= ln && r.depth === q.depth).sort((a, b) => b.line - a.line)[0];
+            // An ID nested in plain quoted content (not a callout) still belongs to
+            // the innermost environment that contains it.
+            if (!rec)
+                rec = callouts.filter(r => r.line < ln && r.endLine >= ln).sort((a, b) => b.depth - a.depth || b.line - a.line)[0];
         }
-        else
-            rec = callouts.find(r => r.line === ln) ?? records.filter(r => r.endLine === ln).sort((a, b) => a.depth - b.depth || (a.kind === 'theorem' ? -1 : 1))[0];
+        else {
+            // An inline block ID belongs to the environment whose own body contains
+            // that line. The reference depth of the line is authoritative: a line at
+            // depth d is the body of the callout at depth d, while a line that only
+            // falls inside nested content still belongs to the innermost enclosing
+            // environment. `endLine` alone is not enough because a trailing quoted
+            // blank line is part of the record but not of the labelled body line.
+            const lineDepth = q.depth;
+            const containing = callouts.filter(r => r.line < ln && r.endLine >= ln);
+            rec = callouts.find(r => r.line === ln)
+                ?? containing.filter(r => r.depth === lineDepth).sort((a, b) => b.line - a.line)[0]
+                ?? containing.sort((a, b) => b.depth - a.depth || b.line - a.line)[0]
+                ?? records.filter(r => r.endLine === ln).sort((a, b) => b.depth - a.depth || (a.kind === 'theorem' ? -1 : 1))[0];
+        }
         // $$...$$ ^id on its closing line is outside the mathematical content.
         const eq = equations.find(r => r.endLine === ln && m.index >= r.to);
         if (eq)
@@ -370,7 +389,7 @@ function parse(path: string, source: string, cache: {
     // Cache supplements missing bindings; it must not overwrite an explicit nested subfigure ID.
     for (const [id, b] of Object.entries(cache.blocks || {})) {
         const p = b.position;
-        if (!p || blocks.has(id))
+        if (!p || blocks.has(id) || (b as { anSynthetic?: boolean }).anSynthetic)
             continue;
         const lo = p.start.line, hi = p.end.line;
         const exact = records.filter(r => r.line === lo && r.endLine <= hi);
@@ -637,18 +656,18 @@ function graph(notes: ParsedNote[], opts: Partial<typeof DEFAULTS> = {}, resolve
     const settings = { ...DEFAULTS, ...opts }, map = new Map(notes.map(n => [n.path, n])), paths = new Set(map.keys()), referenced = new Set<string>(), warnings = notes.flatMap(n => n.warnings);
     for (const note of notes)
         for (const ref of note.refs) {
-            const p = resolvePath(ref.file, note.path, paths, resolver);
+            const p = resolvePath(ref.file, note.path, paths, resolver), target = p ? map.get(p) : undefined;
             ref.targetPath = p;
-            ref.target = p ? map.get(p)!.blocks.get(ref.block) ?? null : null;
+            ref.target = target ? target.blocks.get(ref.block) ?? null : null;
             if (ref.target)
                 referenced.add(p + '#^' + ref.block);
         }
     for (const n of notes)
         assign(n, settings, referenced, chapters?.get(n.path));
     return { notes: map, settings, warnings, referenced, resolve(raw: string, here: string) { const t = splitTarget(raw); if (!t)
-            return null; const p = resolvePath(t.file, here, paths, resolver); return p ? map.get(p)!.blocks.get(t.block) || null : null; },
+            return null; const p = resolvePath(t.file, here, paths, resolver), note = p ? map.get(p) : undefined; return note ? note.blocks.get(t.block) || null : null; },
         resolveLabel(raw: string, here: string) { const t = labelTarget(raw); if (!t)
-            return null; const p = resolvePath(t.file, here, paths, resolver); return p ? map.get(p)!.blocks.get(t.block) || null : null; } };
+            return null; const p = resolvePath(t.file, here, paths, resolver), note = p ? map.get(p) : undefined; return note ? note.blocks.get(t.block) || null : null; } };
 }
 /** Move exclusive legacy defaults into the single per-environment editor. */
 function migrateReferenceFormats(settings: typeof DEFAULTS) {
@@ -691,6 +710,7 @@ function refText(r: SourceRecord | null | undefined, settings = DEFAULTS, label?
     return String(format).replace(/\{(number|type|name|abbr|title|file)\}/g, (_, k: 'number' | 'type' | 'name' | 'abbr' | 'title' | 'file') => ({ number, type, name, abbr, title: plain(r.title), file: r.path.replace(/\.md$/i, '').split('/').pop() || '' })[k]);
 }
 function referenceTex(tex: string, resolve: (label: string) => SourceRecord | null, links = false) {
+    tex = tex.replace(/\\label\s*\{[^{}]*\}/g, '');
     const masked = maskComments(tex), edits: {from:number;to:number;text:string}[] = [];
     for (const m of masked.matchAll(/(?<![A-Za-z\\])\\(eq)?ref\s*\{([^{}]*)\}/g)) {
         const key = m[2].trim(), target = resolve(key), name = labelTarget(key)?.block || key.replace(/^\^/, '');
@@ -722,6 +742,27 @@ function taggedTex(eq: SourceRecord, resolve?: (label: string) => SourceRecord |
     }
     return tex;
 }
+/**
+ * Render the source of one equation for the reference preview. A row-labelled
+ * reference can either show only its row (keeping its own tag) or the whole
+ * environment; unlabelled and unsupported environments always stay whole.
+ */
+function previewTex(eq: SourceRecord, label?: string, rowOnly = false, resolve?: (label: string) => SourceRecord | null) {
+    if (!rowOnly || !label || !eq.rows) return taggedTex(eq, resolve);
+    const row = eq.rows.find(item => item.labels.includes(label)), number = referenceNumber(eq, label);
+    if (!row || !number) return taggedTex(eq, resolve);
+    const content = (eq.tex || '').slice(row.from, row.to)
+        .replace(/\\label\s*\{[^{}]*\}/g, '')
+        .replace(/\\(?:notag|nonumber)\b/g, '')
+        .trim();
+    if (!content) return taggedTex(eq, resolve);
+    // Put the tag and the closing delimiter on fresh lines: a TeX comment at the
+    // end of the row would otherwise comment out the rest of the generated block.
+    const tag = row.tag ? '' : '\\tag{' + number + '}\n';
+    let tex = '\\begin{align*}' + content + '\n' + tag + '\\end{align*}';
+    if (resolve) tex = referenceTex(tex, resolve);
+    return tex;
+}
 function typeNames(key: string, opts: Partial<typeof DEFAULTS> = {}) {
     const custom = environments(opts)[key];
     return custom ? [custom.name, key] : TYPES[key] || MEDIA[key] || [key === 'equation' ? 'Equation' : key, key];
@@ -734,4 +775,4 @@ function labelName(key: string, opts: Partial<typeof DEFAULTS> = {}) {
 }
 const validCustomKey = (key: string) => validEnvironmentKey(key, reservedEnvironmentKeys);
 const APPEARANCE_TYPES: Record<string, string[]> = { ...TYPES, algorithm: MEDIA.algorithm };
-export default { migrateReferenceFormats, referenceFormat, environments, referenceOverrides, typeNames, labelName, validCustomKey, TYPES, APPEARANCE_TYPES, MEDIA, ABBR, mediaCanon, canon, DEFAULTS, maskedSource, mathSpans, latexCommands, parse, graph, refText, referenceNumber, taggedTex, referenceTex, splitTarget, labelTarget, encodeLabel, decodeLabel, resolvePath, cleanPath, lineOf, quote, plain };
+export default { migrateReferenceFormats, referenceFormat, environments, referenceOverrides, typeNames, labelName, validCustomKey, TYPES, APPEARANCE_TYPES, MEDIA, ABBR, mediaCanon, canon, DEFAULTS, maskedSource, mathSpans, latexCommands, parse, graph, refText, referenceNumber, taggedTex, previewTex, referenceTex, splitTarget, labelTarget, encodeLabel, decodeLabel, resolvePath, cleanPath, lineOf, quote, plain };
