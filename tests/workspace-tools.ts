@@ -144,7 +144,7 @@ test('large-vault indexing reuses unchanged notes, skips duplicate refreshes and
     sources.set('reader.md','[[notes/0#^target]]');
     const files=[...sources.keys()].map(path=>({path,stat:{mtime:1}}));
     const cache:Record<string,any>={};
-    const app:any={vault:{getMarkdownFiles:()=>files,cachedRead:async(file:any)=>sources.get(file.path)},metadataCache:{getFileCache:(file:any)=>cache[file.path]||{},getFirstLinkpathDest:(name:string)=>files.find(file=>file.path===name+'.md')},workspace:{getLeavesOfType:()=>[]}};
+    const app:any={vault:{getMarkdownFiles:()=>files,getAbstractFileByPath:(path:string)=>files.find(file=>file.path===path)||null,cachedRead:async(file:any)=>sources.get(file.path)},metadataCache:{getFileCache:(file:any)=>cache[file.path]||{},getFirstLinkpathDest:(name:string)=>files.find(file=>file.path===name+'.md')},workspace:{getLeavesOfType:()=>[]}};
     const plugin=new AcademicNotes(app,{} as any); plugin.settings={...DEFAULTS};plugin.active=true;
     let refreshed=0;plugin.readers.add(()=>refreshed++);
     const refreshedByPath=new Map<string,number>();
@@ -167,7 +167,7 @@ test('indexing retains edits arriving during an asynchronous read and awaits a f
     let source='> [!thm] Old\n> Body',first=true,release!:()=>void;
     const blocked=new Promise<void>(resolve=>{release=resolve;});
     const file={path:'race.md',stat:{mtime:1}};
-    const app:any={vault:{getMarkdownFiles:()=>[file],cachedRead:async()=>{const snapshot=source;if(first){first=false;await blocked;}return snapshot;}},metadataCache:{getFileCache:()=>({}),getFirstLinkpathDest:()=>null},workspace:{getLeavesOfType:()=>[]}};
+    const app:any={vault:{getMarkdownFiles:()=>[file],getAbstractFileByPath:()=>file,cachedRead:async()=>{const snapshot=source;if(first){first=false;await blocked;}return snapshot;}},metadataCache:{getFileCache:()=>({}),getFirstLinkpathDest:()=>null},workspace:{getLeavesOfType:()=>[]}};
     const plugin=new AcademicNotes(app,{} as any);plugin.settings={...DEFAULTS};plugin.active=true;
     try {
         const initial=plugin.rebuild();source='> [!thm] New\n> Body';plugin.dirty.set(file.path,true);

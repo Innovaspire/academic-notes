@@ -857,9 +857,9 @@ var require_directives = __commonJS({
         this.tags = Object.assign({}, _Directives.defaultTags, tags);
       }
       clone() {
-        const copy = new _Directives(this.yaml, this.tags);
-        copy.docStart = this.docStart;
-        return copy;
+        const copy2 = new _Directives(this.yaml, this.tags);
+        copy2.docStart = this.docStart;
+        return copy2;
       }
       /**
        * During parsing, get a Directives instance for the current document and
@@ -1168,10 +1168,10 @@ var require_Node = __commonJS({
       }
       /** Create a copy of this node.  */
       clone() {
-        const copy = Object.create(Object.getPrototypeOf(this), Object.getOwnPropertyDescriptors(this));
+        const copy2 = Object.create(Object.getPrototypeOf(this), Object.getOwnPropertyDescriptors(this));
         if (this.range)
-          copy.range = this.range.slice();
-        return copy;
+          copy2.range = this.range.slice();
+        return copy2;
       }
       /** A plain JavaScript representation of this node. */
       toJS(doc, { mapAsMap, maxAliasCount, onAnchor, reviver } = {}) {
@@ -1465,13 +1465,13 @@ var require_Collection = __commonJS({
        * @param schema - If defined, overwrites the original's schema
        */
       clone(schema) {
-        const copy = Object.create(Object.getPrototypeOf(this), Object.getOwnPropertyDescriptors(this));
+        const copy2 = Object.create(Object.getPrototypeOf(this), Object.getOwnPropertyDescriptors(this));
         if (schema)
-          copy.schema = schema;
-        copy.items = copy.items.map((it) => identity.isNode(it) || identity.isPair(it) ? it.clone(schema) : it);
+          copy2.schema = schema;
+        copy2.items = copy2.items.map((it) => identity.isNode(it) || identity.isPair(it) ? it.clone(schema) : it);
         if (this.range)
-          copy.range = this.range.slice();
-        return copy;
+          copy2.range = this.range.slice();
+        return copy2;
       }
       /**
        * Adds a value to the collection. For `!!map` and `!!omap` the value must
@@ -3890,9 +3890,9 @@ var require_Schema = __commonJS({
         this.sortMapEntries = typeof sortMapEntries === "function" ? sortMapEntries : sortMapEntries === true ? sortMapEntriesByKey : null;
       }
       clone() {
-        const copy = Object.create(_Schema.prototype, Object.getOwnPropertyDescriptors(this));
-        copy.tags = this.tags.slice();
-        return copy;
+        const copy2 = Object.create(_Schema.prototype, Object.getOwnPropertyDescriptors(this));
+        copy2.tags = this.tags.slice();
+        return copy2;
       }
     };
     exports2.Schema = Schema;
@@ -4035,21 +4035,21 @@ var require_Document = __commonJS({
        * Custom Node values that inherit from `Object` still refer to their original instances.
        */
       clone() {
-        const copy = Object.create(_Document.prototype, {
+        const copy2 = Object.create(_Document.prototype, {
           [identity.NODE_TYPE]: { value: identity.DOC }
         });
-        copy.commentBefore = this.commentBefore;
-        copy.comment = this.comment;
-        copy.errors = this.errors.slice();
-        copy.warnings = this.warnings.slice();
-        copy.options = Object.assign({}, this.options);
+        copy2.commentBefore = this.commentBefore;
+        copy2.comment = this.comment;
+        copy2.errors = this.errors.slice();
+        copy2.warnings = this.warnings.slice();
+        copy2.options = Object.assign({}, this.options);
         if (this.directives)
-          copy.directives = this.directives.clone();
-        copy.schema = this.schema.clone();
-        copy.contents = identity.isNode(this.contents) ? this.contents.clone(copy.schema) : this.contents;
+          copy2.directives = this.directives.clone();
+        copy2.schema = this.schema.clone();
+        copy2.contents = identity.isNode(this.contents) ? this.contents.clone(copy2.schema) : this.contents;
         if (this.range)
-          copy.range = this.range.slice();
-        return copy;
+          copy2.range = this.range.slice();
+        return copy2;
       }
       /** Adds a value to the document. */
       add(value) {
@@ -8422,7 +8422,7 @@ var require_Options = __commonJS({
       return Object.keys(def).concat(Object.getOwnPropertySymbols(def));
     }
     exports2.keys = keys;
-    function copy(def) {
+    function copy2(def) {
       var e_1, _a;
       var props = {};
       try {
@@ -8433,7 +8433,7 @@ var require_Options = __commonJS({
           if (Array.isArray(value)) {
             prop.value = insert2([], value, false);
           } else if (isObject(value)) {
-            prop.value = copy(value);
+            prop.value = copy2(value);
           }
           if (prop.enumerable) {
             props[key2] = prop;
@@ -8450,7 +8450,7 @@ var require_Options = __commonJS({
       }
       return Object.defineProperties(def.constructor === Expandable ? expandable({}) : {}, props);
     }
-    exports2.copy = copy;
+    exports2.copy = copy2;
     function insert2(dst, src, warn) {
       var e_2, _a;
       if (warn === void 0) {
@@ -8483,7 +8483,7 @@ var require_Options = __commonJS({
           dst[key3] = [];
           insert2(dst[key3], sval, false);
         } else if (isObject(sval)) {
-          dst[key3] = copy(sval);
+          dst[key3] = copy2(sval);
         } else {
           dst[key3] = sval;
         }
@@ -46781,7 +46781,7 @@ var require_inflate = __commonJS({
       state.distcode = distfix;
       state.distbits = 5;
     }
-    function updatewindow(strm, src, end, copy) {
+    function updatewindow(strm, src, end, copy2) {
       var dist;
       var state = strm.state;
       if (state.window === null) {
@@ -46790,20 +46790,20 @@ var require_inflate = __commonJS({
         state.whave = 0;
         state.window = new utils.Buf8(state.wsize);
       }
-      if (copy >= state.wsize) {
+      if (copy2 >= state.wsize) {
         utils.arraySet(state.window, src, end - state.wsize, state.wsize, 0);
         state.wnext = 0;
         state.whave = state.wsize;
       } else {
         dist = state.wsize - state.wnext;
-        if (dist > copy) {
-          dist = copy;
+        if (dist > copy2) {
+          dist = copy2;
         }
-        utils.arraySet(state.window, src, end - copy, dist, state.wnext);
-        copy -= dist;
-        if (copy) {
-          utils.arraySet(state.window, src, end - copy, copy, 0);
-          state.wnext = copy;
+        utils.arraySet(state.window, src, end - copy2, dist, state.wnext);
+        copy2 -= dist;
+        if (copy2) {
+          utils.arraySet(state.window, src, end - copy2, copy2, 0);
+          state.wnext = copy2;
           state.whave = state.wsize;
         } else {
           state.wnext += dist;
@@ -46826,7 +46826,7 @@ var require_inflate = __commonJS({
       var hold;
       var bits;
       var _in, _out;
-      var copy;
+      var copy2;
       var from;
       var from_source;
       var here = 0;
@@ -47021,11 +47021,11 @@ var require_inflate = __commonJS({
             /* falls through */
             case EXTRA:
               if (state.flags & 1024) {
-                copy = state.length;
-                if (copy > have) {
-                  copy = have;
+                copy2 = state.length;
+                if (copy2 > have) {
+                  copy2 = have;
                 }
-                if (copy) {
+                if (copy2) {
                   if (state.head) {
                     len = state.head.extra_len - state.length;
                     if (!state.head.extra) {
@@ -47037,17 +47037,17 @@ var require_inflate = __commonJS({
                       next,
                       // extra field is limited to 65536 bytes
                       // - no need for additional size check
-                      copy,
+                      copy2,
                       /*len + copy > state.head.extra_max - len ? state.head.extra_max : copy,*/
                       len
                     );
                   }
                   if (state.flags & 512) {
-                    state.check = crc32(state.check, input, copy, next);
+                    state.check = crc32(state.check, input, copy2, next);
                   }
-                  have -= copy;
-                  next += copy;
-                  state.length -= copy;
+                  have -= copy2;
+                  next += copy2;
+                  state.length -= copy2;
                 }
                 if (state.length) {
                   break inf_leave;
@@ -47061,18 +47061,18 @@ var require_inflate = __commonJS({
                 if (have === 0) {
                   break inf_leave;
                 }
-                copy = 0;
+                copy2 = 0;
                 do {
-                  len = input[next + copy++];
+                  len = input[next + copy2++];
                   if (state.head && len && state.length < 65536) {
                     state.head.name += String.fromCharCode(len);
                   }
-                } while (len && copy < have);
+                } while (len && copy2 < have);
                 if (state.flags & 512) {
-                  state.check = crc32(state.check, input, copy, next);
+                  state.check = crc32(state.check, input, copy2, next);
                 }
-                have -= copy;
-                next += copy;
+                have -= copy2;
+                next += copy2;
                 if (len) {
                   break inf_leave;
                 }
@@ -47087,18 +47087,18 @@ var require_inflate = __commonJS({
                 if (have === 0) {
                   break inf_leave;
                 }
-                copy = 0;
+                copy2 = 0;
                 do {
-                  len = input[next + copy++];
+                  len = input[next + copy2++];
                   if (state.head && len && state.length < 65536) {
                     state.head.comment += String.fromCharCode(len);
                   }
-                } while (len && copy < have);
+                } while (len && copy2 < have);
                 if (state.flags & 512) {
-                  state.check = crc32(state.check, input, copy, next);
+                  state.check = crc32(state.check, input, copy2, next);
                 }
-                have -= copy;
-                next += copy;
+                have -= copy2;
+                next += copy2;
                 if (len) {
                   break inf_leave;
                 }
@@ -47233,23 +47233,23 @@ var require_inflate = __commonJS({
               state.mode = COPY;
             /* falls through */
             case COPY:
-              copy = state.length;
-              if (copy) {
-                if (copy > have) {
-                  copy = have;
+              copy2 = state.length;
+              if (copy2) {
+                if (copy2 > have) {
+                  copy2 = have;
                 }
-                if (copy > left) {
-                  copy = left;
+                if (copy2 > left) {
+                  copy2 = left;
                 }
-                if (copy === 0) {
+                if (copy2 === 0) {
                   break inf_leave;
                 }
-                utils.arraySet(output, input, next, copy, put);
-                have -= copy;
-                next += copy;
-                left -= copy;
-                put += copy;
-                state.length -= copy;
+                utils.arraySet(output, input, next, copy2, put);
+                have -= copy2;
+                next += copy2;
+                left -= copy2;
+                put += copy2;
+                state.length -= copy2;
                 break;
               }
               state.mode = TYPE;
@@ -47350,7 +47350,7 @@ var require_inflate = __commonJS({
                       break;
                     }
                     len = state.lens[state.have - 1];
-                    copy = 3 + (hold & 3);
+                    copy2 = 3 + (hold & 3);
                     hold >>>= 2;
                     bits -= 2;
                   } else if (here_val === 17) {
@@ -47366,7 +47366,7 @@ var require_inflate = __commonJS({
                     hold >>>= here_bits;
                     bits -= here_bits;
                     len = 0;
-                    copy = 3 + (hold & 7);
+                    copy2 = 3 + (hold & 7);
                     hold >>>= 3;
                     bits -= 3;
                   } else {
@@ -47382,16 +47382,16 @@ var require_inflate = __commonJS({
                     hold >>>= here_bits;
                     bits -= here_bits;
                     len = 0;
-                    copy = 11 + (hold & 127);
+                    copy2 = 11 + (hold & 127);
                     hold >>>= 7;
                     bits -= 7;
                   }
-                  if (state.have + copy > state.nlen + state.ndist) {
+                  if (state.have + copy2 > state.nlen + state.ndist) {
                     strm.msg = "invalid bit length repeat";
                     state.mode = BAD;
                     break;
                   }
-                  while (copy--) {
+                  while (copy2--) {
                     state.lens[state.have++] = len;
                   }
                 }
@@ -47610,39 +47610,39 @@ var require_inflate = __commonJS({
               if (left === 0) {
                 break inf_leave;
               }
-              copy = _out - left;
-              if (state.offset > copy) {
-                copy = state.offset - copy;
-                if (copy > state.whave) {
+              copy2 = _out - left;
+              if (state.offset > copy2) {
+                copy2 = state.offset - copy2;
+                if (copy2 > state.whave) {
                   if (state.sane) {
                     strm.msg = "invalid distance too far back";
                     state.mode = BAD;
                     break;
                   }
                 }
-                if (copy > state.wnext) {
-                  copy -= state.wnext;
-                  from = state.wsize - copy;
+                if (copy2 > state.wnext) {
+                  copy2 -= state.wnext;
+                  from = state.wsize - copy2;
                 } else {
-                  from = state.wnext - copy;
+                  from = state.wnext - copy2;
                 }
-                if (copy > state.length) {
-                  copy = state.length;
+                if (copy2 > state.length) {
+                  copy2 = state.length;
                 }
                 from_source = state.window;
               } else {
                 from_source = output;
                 from = put - state.offset;
-                copy = state.length;
+                copy2 = state.length;
               }
-              if (copy > left) {
-                copy = left;
+              if (copy2 > left) {
+                copy2 = left;
               }
-              left -= copy;
-              state.length -= copy;
+              left -= copy2;
+              state.length -= copy2;
               do {
                 output[put++] = from_source[from++];
-              } while (--copy);
+              } while (--copy2);
               if (state.length === 0) {
                 state.mode = LEN;
               }
@@ -48053,12 +48053,12 @@ var require_inflate2 = __commonJS({
 var require_pako = __commonJS({
   "node_modules/pako/index.js"(exports2, module2) {
     "use strict";
-    var assign2 = require_common().assign;
+    var assign3 = require_common().assign;
     var deflate = require_deflate2();
     var inflate = require_inflate2();
     var constants = require_constants();
     var pako = {};
-    assign2(pako, deflate, inflate, constants);
+    assign3(pako, deflate, inflate, constants);
     module2.exports = pako;
   }
 });
@@ -65158,7 +65158,11 @@ var ENGLISH = {
   "\u5C06\u4FEE\u6539 {0} \u7BC7\u7B14\u8BB0\u3001{1} \u5904\u5185\u5BB9\u3002": "Update {1} locations in {0} notes.",
   "\u6807\u7B7E\u53CA\u5F15\u7528\u5DF2\u66F4\u65B0\u3002": "The label and its references were updated.",
   "\u7EF4\u62A4\u6539\u540D\u5F15\u7528": "Maintain references after rename",
+  "\u4FEE\u6B63\u539F\u751F\u5757\u4F4D\u7F6E": "Align native block positions",
+  "\u6062\u590D\u539F\u751F\u5757\u4F4D\u7F6E": "Restore native block positions",
   "\u5F15\u7528\u5185\u5BB9\u9884\u89C8": "Reference preview",
+  "\u591A\u884C\u516C\u5F0F\u9884\u89C8\u53EA\u663E\u793A\u76EE\u6807\u884C": "Preview only the labelled row of a multi-line equation",
+  "\u5173\u95ED\u65F6\u663E\u793A\u6574\u4E2A\u516C\u5F0F\u5757\uFF1B\u4EC5\u5728\u5F15\u7528\u591A\u884C\u73AF\u5883\u4E2D\u7684\u67D0\u4E00\u884C\u6807\u7B7E\u65F6\u751F\u6548\u3002": "Turn off to show the whole equation block. Applies only when the reference targets one row of a multi-line environment.",
   "\u56FE\u8868\u5185\u5BB9\u8BF7\u6253\u5F00\u7B14\u8BB0\u67E5\u770B\u3002": "Open the note to view this figure.",
   "\u6253\u5F00\u76EE\u6807": "Open target",
   "\u65B0\u6807\u7B7E\u9875\u6253\u5F00": "Open in new tab",
@@ -66111,6 +66115,7 @@ function parse(path, source, cache = {}, opts = {}) {
     const rawMeta = m[2] === void 0 ? "auto" : m[2].trim();
     const figure = key2 === "figure" ? figureMetadata(rawMeta) : void 0;
     const meta = figure ? figure.numbering : rawMeta;
+    const title = (m[4] || "").trim().replace(/(?:^|[ \t])\^[A-Za-z0-9-]+[ \t]*$/, "").trim();
     const rec = {
       kind: calloutCanon(m[1]) ? "theorem" : key2,
       key: key2,
@@ -66121,7 +66126,7 @@ function parse(path, source, cache = {}, opts = {}) {
       from: starts[line],
       to: starts[endLine] + lines[endLine].length,
       depth: q.depth,
-      title: (m[4] || "").trim(),
+      title,
       manual: meta && !["auto", "*", "-"].includes(meta) ? meta : null,
       suppress: meta === "" || meta === "*" || meta === "-",
       number: "",
@@ -66129,7 +66134,7 @@ function parse(path, source, cache = {}, opts = {}) {
       ids: [],
       layout: figure?.layout,
       environment: custom[key2],
-      proofOwnLine: key2 === "proof" && (!(m[4] || "").trim() || !quote(lines[line + 1] || "").body.trim())
+      proofOwnLine: key2 === "proof" && (!title || !quote(lines[line + 1] || "").body.trim())
     };
     (rec.kind === "theorem" ? theorems : media).push(rec);
     callouts.push(rec);
@@ -66180,8 +66185,13 @@ function parse(path, source, cache = {}, opts = {}) {
       rec = candidates2[0];
       if (!rec)
         rec = callouts.filter((r) => r.line < ln && r.endLine >= ln && r.depth === q.depth).sort((a, b) => b.line - a.line)[0];
-    } else
-      rec = callouts.find((r) => r.line === ln) ?? records.filter((r) => r.endLine === ln).sort((a, b) => a.depth - b.depth || (a.kind === "theorem" ? -1 : 1))[0];
+      if (!rec)
+        rec = callouts.filter((r) => r.line < ln && r.endLine >= ln).sort((a, b) => b.depth - a.depth || b.line - a.line)[0];
+    } else {
+      const lineDepth = q.depth;
+      const containing = callouts.filter((r) => r.line < ln && r.endLine >= ln);
+      rec = callouts.find((r) => r.line === ln) ?? containing.filter((r) => r.depth === lineDepth).sort((a, b) => b.line - a.line)[0] ?? containing.sort((a, b) => b.depth - a.depth || b.line - a.line)[0] ?? records.filter((r) => r.endLine === ln).sort((a, b) => b.depth - a.depth || (a.kind === "theorem" ? -1 : 1))[0];
+    }
     const eq = equations.find((r) => r.endLine === ln && m.index >= r.to);
     if (eq)
       rec = eq;
@@ -66224,7 +66234,7 @@ function parse(path, source, cache = {}, opts = {}) {
   }
   for (const [id2, b] of Object.entries(cache.blocks || {})) {
     const p = b.position;
-    if (!p || blocks.has(id2))
+    if (!p || blocks.has(id2) || b.anSynthetic)
       continue;
     const lo = p.start.line, hi = p.end.line;
     const exact = records.filter((r) => r.line === lo && r.endLine <= hi);
@@ -66496,9 +66506,9 @@ function graph(notes, opts = {}, resolver, chapters) {
   const settings = { ...DEFAULTS, ...opts }, map = new Map(notes.map((n) => [n.path, n])), paths = new Set(map.keys()), referenced = /* @__PURE__ */ new Set(), warnings = notes.flatMap((n) => n.warnings);
   for (const note of notes)
     for (const ref of note.refs) {
-      const p = resolvePath(ref.file, note.path, paths, resolver);
+      const p = resolvePath(ref.file, note.path, paths, resolver), target = p ? map.get(p) : void 0;
       ref.targetPath = p;
-      ref.target = p ? map.get(p).blocks.get(ref.block) ?? null : null;
+      ref.target = target ? target.blocks.get(ref.block) ?? null : null;
       if (ref.target)
         referenced.add(p + "#^" + ref.block);
     }
@@ -66513,15 +66523,15 @@ function graph(notes, opts = {}, resolver, chapters) {
       const t2 = splitTarget(raw);
       if (!t2)
         return null;
-      const p = resolvePath(t2.file, here, paths, resolver);
-      return p ? map.get(p).blocks.get(t2.block) || null : null;
+      const p = resolvePath(t2.file, here, paths, resolver), note = p ? map.get(p) : void 0;
+      return note ? note.blocks.get(t2.block) || null : null;
     },
     resolveLabel(raw, here) {
       const t2 = labelTarget(raw);
       if (!t2)
         return null;
-      const p = resolvePath(t2.file, here, paths, resolver);
-      return p ? map.get(p).blocks.get(t2.block) || null : null;
+      const p = resolvePath(t2.file, here, paths, resolver), note = p ? map.get(p) : void 0;
+      return note ? note.blocks.get(t2.block) || null : null;
     }
   };
 }
@@ -66564,6 +66574,7 @@ function refText(r, settings = DEFAULTS, label3) {
   return String(format).replace(/\{(number|type|name|abbr|title|file)\}/g, (_, k) => ({ number, type, name, abbr, title: plain(r.title), file: r.path.replace(/\.md$/i, "").split("/").pop() || "" })[k]);
 }
 function referenceTex(tex, resolve, links = false) {
+  tex = tex.replace(/\\label\s*\{[^{}]*\}/g, "");
   const masked = maskComments(tex), edits = [];
   for (const m of masked.matchAll(/(?<![A-Za-z\\])\\(eq)?ref\s*\{([^{}]*)\}/g)) {
     const key2 = m[2].trim(), target = resolve(key2), name = labelTarget(key2)?.block || key2.replace(/^\^/, "");
@@ -66595,6 +66606,17 @@ function taggedTex(eq, resolve, links = false) {
   }
   return tex;
 }
+function previewTex(eq, label3, rowOnly = false, resolve) {
+  if (!rowOnly || !label3 || !eq.rows) return taggedTex(eq, resolve);
+  const row = eq.rows.find((item) => item.labels.includes(label3)), number = referenceNumber(eq, label3);
+  if (!row || !number) return taggedTex(eq, resolve);
+  const content = (eq.tex || "").slice(row.from, row.to).replace(/\\label\s*\{[^{}]*\}/g, "").replace(/\\(?:notag|nonumber)\b/g, "").trim();
+  if (!content) return taggedTex(eq, resolve);
+  const tag = row.tag ? "" : "\\tag{" + number + "}\n";
+  let tex = "\\begin{align*}" + content + "\n" + tag + "\\end{align*}";
+  if (resolve) tex = referenceTex(tex, resolve);
+  return tex;
+}
 function typeNames(key2, opts = {}) {
   const custom = environments(opts)[key2];
   return custom ? [custom.name, key2] : TYPES[key2] || MEDIA[key2] || [key2 === "equation" ? "Equation" : key2, key2];
@@ -66607,7 +66629,68 @@ function labelName(key2, opts = {}) {
 }
 var validCustomKey = (key2) => validEnvironmentKey(key2, reservedEnvironmentKeys);
 var APPEARANCE_TYPES = { ...TYPES, algorithm: MEDIA.algorithm };
-var engine_default = { migrateReferenceFormats, referenceFormat, environments, referenceOverrides, typeNames, labelName, validCustomKey, TYPES, APPEARANCE_TYPES, MEDIA, ABBR, mediaCanon, canon, DEFAULTS, maskedSource, mathSpans, latexCommands, parse, graph, refText, referenceNumber, taggedTex, referenceTex, splitTarget, labelTarget, encodeLabel, decodeLabel, resolvePath, cleanPath, lineOf, quote, plain };
+var engine_default = { migrateReferenceFormats, referenceFormat, environments, referenceOverrides, typeNames, labelName, validCustomKey, TYPES, APPEARANCE_TYPES, MEDIA, ABBR, mediaCanon, canon, DEFAULTS, maskedSource, mathSpans, latexCommands, parse, graph, refText, referenceNumber, taggedTex, previewTex, referenceTex, splitTarget, labelTarget, encodeLabel, decodeLabel, resolvePath, cleanPath, lineOf, quote, plain };
+
+// src/rendering/custom-appearance.ts
+var drawing = (paths) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" stroke="black" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
+var MOTIFS = {
+  laurel: drawing('<path d="M23 41C8 35 5 19 16 7M25 41C40 35 43 19 32 7M14 12Q5 12 9 20Q16 20 14 12M10 23Q2 25 10 31Q17 28 10 23M15 33Q10 40 20 40Q23 34 15 33M34 12Q43 12 39 20Q32 20 34 12M38 23Q46 25 38 31Q31 28 38 23M33 33Q38 40 28 40Q25 34 33 33"/><path d="M19 23l4 4 7-9M18 43l6-3 6 3"/>'),
+  compass: drawing('<circle cx="24" cy="24" r="17"/><circle cx="24" cy="24" r="13" stroke-dasharray="1 4"/><path d="M24 3v6m0 30v6M3 24h6m30 0h6M30 15l-3 12-12 6 6-12zM21 21l6 6"/><circle cx="24" cy="24" r="2"/>'),
+  rosette: drawing('<path d="M24 5C30 14 37 7 35 17C46 17 38 26 42 30C32 31 35 41 25 37C18 46 16 34 8 37C11 28 1 27 9 20C5 12 18 16 17 7Z"/><circle cx="24" cy="24" r="9"/><circle cx="24" cy="24" r="5"/><path d="M21 24l2 2 4-5"/>'),
+  orbit: drawing('<circle cx="24" cy="24" r="3"/><ellipse cx="24" cy="24" rx="20" ry="8" transform="rotate(-35 24 24)"/><ellipse cx="24" cy="24" rx="20" ry="8" transform="rotate(35 24 24)"/><ellipse cx="24" cy="24" rx="8" ry="20"/><circle cx="39" cy="12" r="2" fill="black"/>'),
+  lattice: drawing('<path d="M24 4l17 10v20L24 44 7 34V14ZM7 14l17 10 17-10M24 24v20M24 4v20M7 34l17-10 17 10"/><path d="M15 9v20l17 10M33 9v20L16 39M7 24l17 10 17-10"/>'),
+  knot: drawing('<path d="M24 6C11-5 0 14 13 23l12 10C38 44 49 25 36 16L24 6ZM24 42C37 53 48 34 35 25L23 15C10 4-1 23 12 32l12 10Z" transform="translate(5 5) scale(.79)"/><path d="M16 18l16 12M16 30l16-12"/>'),
+  arch: drawing('<path d="M7 41h34M10 37V23a14 14 0 0128 0v14M15 37V23a9 9 0 0118 0v14M19 37V24a5 5 0 0110 0v13M8 37h9m14 0h9M24 5v5M13 10l4 5m18-5l-4 5M8 20l7 2m25-2l-7 2"/>'),
+  quill: drawing('<path d="M8 41l24-27M13 34C7 17 27 5 41 6C39 22 29 35 13 34ZM20 27l-2-10m9 2l-1-9M20 27l12-1M27 19l10-1M8 42h19"/><path d="M32 36h8m-6 4h8"/>'),
+  folio: drawing('<path d="M24 12C18 7 11 8 5 10v27c7-2 13-1 19 3 6-4 12-5 19-3V10c-6-2-13-3-19 2ZM24 12v28M9 15c4-1 7 0 11 2M9 21c4-1 7 0 11 2M9 27c4-1 7 0 11 2M28 17c4-2 7-3 11-2M28 23c4-2 7-3 11-2M28 29c4-2 7-3 11-2"/>')
+};
+function parseAppearance(raw, roles = Object.keys(engine_default.APPEARANCE_TYPES)) {
+  const result = {};
+  try {
+    if (raw.length > 2e4) return result;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return result;
+    for (const key2 of roles) {
+      const entry = parsed[key2];
+      if (!entry || typeof entry !== "object") continue;
+      const clean = {};
+      for (const field of ["light", "dark", "motifLight", "motifDark"]) {
+        const color = entry[field];
+        if (typeof color === "string" && /^#[0-9a-f]{6}$/i.test(color)) clean[field] = color;
+      }
+      const motif = entry.motif;
+      if (typeof motif === "string" && (Object.hasOwn(MOTIFS, motif) || motif === "none")) clean.motif = motif;
+      result[key2] = clean;
+    }
+  } catch {
+  }
+  return result;
+}
+function motifMask(id2) {
+  return Object.hasOwn(MOTIFS, id2) ? `url("data:image/svg+xml,${encodeURIComponent(MOTIFS[id2])}")` : "none";
+}
+function titleInk(hex) {
+  const rgb = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+  const luminance = rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+  return luminance > 0.179 ? "#000000" : "#ffffff";
+}
+var appearanceVariables = Object.keys(engine_default.APPEARANCE_TYPES).flatMap((key2) => ["color", "ink", "motif-color", "symbol", "motif-display"].map((part) => `--an-${part}-${key2}`));
+function appearanceValues(raw, dark, roles = Object.keys(engine_default.APPEARANCE_TYPES)) {
+  const values = {};
+  for (const [key2, entry] of Object.entries(parseAppearance(raw, roles))) {
+    const color = dark ? entry.dark : entry.light, motifColor = dark ? entry.motifDark : entry.motifLight;
+    if (color) {
+      values[`--an-color-${key2}`] = color;
+      values[`--an-ink-${key2}`] = titleInk(color);
+    }
+    if (motifColor) values[`--an-motif-color-${key2}`] = motifColor;
+    if (entry.motif) {
+      values[`--an-symbol-${key2}`] = motifMask(entry.motif);
+      values[`--an-motif-display-${key2}`] = entry.motif === "none" ? "none" : "block";
+    }
+  }
+  return values;
+}
 
 // src/ui/rename-reference.ts
 var import_obsidian3 = require("obsidian");
@@ -66658,7 +66741,10 @@ function labelInsertion(source, record, settings = {}) {
     id2 = "an-" + Math.random().toString(36).slice(2, 10);
   } while (note.anchors?.has(id2) || note.blocks.has(id2));
   const prefix = record.kind === "equation" || record.diagram ? engine_default.quote(note.lines[record.endLine]).prefix : record.depth > 1 ? "> ".repeat(record.depth - 1) : "";
-  return { id: id2, at: note.starts[record.endLine] + note.lines[record.endLine].length, text: "\n" + prefix + "\n" + prefix + "^" + id2 + "\n" };
+  const at = note.starts[record.endLine] + note.lines[record.endLine].length;
+  const next = source.slice(at).replace(/^\r?\n/, "").split("\n")[0];
+  const trailing = prefix && engine_default.quote(next).depth > 0 ? "\n" + prefix : "\n";
+  return { id: id2, at, text: "\n" + prefix + "\n" + prefix + "^" + id2 + trailing };
 }
 function currentRecord(source, original, record, settings) {
   const note = engine_default.parse(record.path, source, {}, settings), text = original.slice(record.from, record.to);
@@ -66910,19 +66996,69 @@ var RenameReferenceModal = class extends import_obsidian3.Modal {
 };
 
 // src/ui/reference-preview.ts
+function pagePreviewHost(plugin) {
+  try {
+    const internal = plugin.app?.internalPlugins;
+    if (!internal || typeof internal.getPluginById !== "function") return void 0;
+    return internal.getPluginById("page-preview");
+  } catch {
+    return void 0;
+  }
+}
+function nativePreviewAvailable(plugin) {
+  const host = pagePreviewHost(plugin);
+  return host === void 0 ? true : host ? host.enabled !== false : false;
+}
+function nativePreviewRequiresModifier(plugin, anchor) {
+  const editing = !!anchor.closest?.(".cm-editor"), source = editing ? "editor" : "preview";
+  const host = pagePreviewHost(plugin), option = host?.instance?.options?.[source];
+  if (typeof option === "boolean") return option;
+  try {
+    const sources = plugin.app.workspace?.hoverLinkSources;
+    const fallback = sources?.[source]?.defaultMod;
+    if (typeof fallback === "boolean") return fallback;
+  } catch {
+  }
+  return editing;
+}
+function prefersNativePreview(target, nativeAvailable = true, interaction) {
+  const { record } = target;
+  const modifierReady = !interaction || !interaction.requiredModifier || interaction.modifier;
+  return nativeAvailable && modifierReady && target.native && (!!record.diagram || record.kind === "theorem" && record.depth === 1 || ["figure", "subfigure", "table", "algorithm"].includes(record.kind));
+}
 function previewTarget(plugin, anchor) {
   const label3 = anchor.dataset.anEqref, path = anchor.dataset.anSource || anchor.closest("[data-an-path]")?.dataset.anPath;
   if (!path || !plugin.graph) return null;
   const raw = label3 || anchor.dataset.anTarget || "", target = label3 ? engine_default.labelTarget(raw) : engine_default.splitTarget(raw);
   const record = label3 ? plugin.graph.resolveLabel(raw, path) : plugin.graph.resolve(raw, path);
-  return record && target ? { record, label: target.block } : null;
+  return record && target ? { record, label: target.block, native: !label3 && !!anchor.getAttribute("href") && /^[A-Za-z0-9-]+$/.test(target.block) } : null;
+}
+function referenceCallout(root, record, title) {
+  const box = root.createDiv({ cls: "callout an-reference-callout", attr: { "data-callout": record.key } });
+  if (record.environment) {
+    box.addClass("an-custom-environment");
+    box.setAttribute("data-an-style", record.environment.style);
+    for (const part of ["color", "ink", "symbol", "motif-color", "motif-display"])
+      box.style.setProperty(`--an-custom-palette-${part}`, `var(--an-${part}-${record.key})`);
+    for (const mode of ["light", "dark"]) {
+      const color = record.environment[mode];
+      if (color) {
+        box.style.setProperty(`--an-custom-color-${mode}`, color);
+        box.style.setProperty(`--an-custom-ink-${mode}`, titleInk(color));
+      }
+    }
+  }
+  if (record.key === "proof" && record.proofOwnLine) box.addClass("an-proof-own-line");
+  box.createDiv({ cls: "callout-title" }).createDiv({ cls: "callout-title-inner", text: title });
+  return box.createDiv({ cls: "callout-content an-reference-excerpt" });
 }
 function renderReferencePreview(plugin, root, target, close) {
   const { record, label: label3 } = target, graph2 = plugin.graph;
   root.addClass("an-reference-preview");
-  root.createEl("h3", { text: engine_default.refText(record, plugin.settings, label3) || engine_default.labelName(record.key, plugin.settings) });
+  const title = engine_default.refText(record, plugin.settings, label3) || engine_default.labelName(record.key, plugin.settings);
+  if (record.kind !== "theorem") root.createEl("h3", { text: title });
   root.createEl("p", { cls: "an-reference-location", text: `${record.path}:${record.line + 1} \xB7 ${label3}` });
-  const body = root.createDiv({ cls: "an-reference-excerpt" });
+  const body = record.kind === "theorem" ? referenceCallout(root, record, title) : root.createDiv({ cls: "an-reference-excerpt" });
   const prose = (value) => value.replace(/<[^>]*>/g, "").replace(/[*_`]/g, "");
   const math = (tex, display) => {
     try {
@@ -66932,11 +67068,18 @@ function renderReferencePreview(plugin, root, target, close) {
     }
   };
   if (record.kind === "equation" && (record.tex?.length || 0) > 8e3) body.createEl("p", { text: t("\u516C\u5F0F\u8F83\u957F\uFF0C\u8BF7\u6253\u5F00\u7B14\u8BB0\u67E5\u770B\u3002") });
-  else if (record.kind === "equation") math(engine_default.taggedTex(record, (key2) => graph2.resolveLabel(key2, record.path)), true);
-  else if (record.diagram || record.kind === "figure" || record.kind === "subfigure") body.createEl("p", { text: record.title || t("\u56FE\u8868\u5185\u5BB9\u8BF7\u6253\u5F00\u7B14\u8BB0\u67E5\u770B\u3002") });
+  else if (record.kind === "equation") {
+    try {
+      math(engine_default.previewTex(record, label3, plugin.settings.referencePreviewRowOnly, (key2) => graph2.resolveLabel(key2, record.path)), true);
+    } catch (error) {
+      plugin.recordError(t("\u5F15\u7528\u5185\u5BB9\u9884\u89C8"), error);
+      body.createEl("p", { text: t("\u516C\u5F0F\u8F83\u957F\uFF0C\u8BF7\u6253\u5F00\u7B14\u8BB0\u67E5\u770B\u3002") });
+    }
+  } else if (record.diagram || record.kind === "figure" || record.kind === "subfigure") body.createEl("p", { text: record.title || t("\u56FE\u8868\u5185\u5BB9\u8BF7\u6253\u5F00\u7B14\u8BB0\u67E5\u770B\u3002") });
   else {
     const note = graph2.notes.get(record.path);
-    const excerpt = (note?.lines.slice(record.line + 1, Math.min(record.endLine + 1, record.line + 14)).map((line) => engine_default.quote(line).body).join("\n") || record.title || "").slice(0, 1800);
+    const text = (note?.lines.slice(record.line + 1, Math.min(record.endLine + 1, record.line + 14)) || []).map((line) => engine_default.quote(line).body.replace(/\r$/, "")).map((line) => line.replace(/^\[![A-Za-z0-9_-]+(?:\|[^\]]*)?\][+-]?[ \t]*/, "")).filter((line) => !/^\^[A-Za-z0-9-]+\s*$/.test(line.trim())).map((line) => line.replace(/[ \t]\^[A-Za-z0-9-]+[ \t]*$/, "")).join("\n");
+    const excerpt = (text || (record.kind === "theorem" ? "" : record.title) || "").slice(0, 1800);
     let at = 0;
     for (const span of engine_default.mathSpans(excerpt)) {
       body.createSpan({ text: prose(excerpt.slice(at, span.from)) });
@@ -66984,11 +67127,19 @@ var ReferencePreviews = class {
       this.touch = event.pointerType === "touch";
       if (!this.card?.contains(event.target) && !this.anchor?.contains(event.target)) this.hide();
     }, true);
+    plugin.registerDomEvent(doc, "mouseover", (event) => {
+      if (!plugin.settings.referencePreview) return;
+      const anchor = this.find(event.target);
+      if (!anchor || anchor.closest(".an-reference-popover")) return;
+      const target = previewTarget(plugin, anchor), interaction = { requiredModifier: nativePreviewRequiresModifier(plugin, anchor), modifier: event.ctrlKey || event.metaKey };
+      if (!target || prefersNativePreview(target, nativePreviewAvailable(plugin), interaction)) return;
+      event.stopPropagation();
+    }, true);
     plugin.registerDomEvent(doc, "pointerover", (event) => {
       if (event.pointerType === "touch") return;
-      this.enter(event.target);
+      this.enter(event.target, false, event.ctrlKey || event.metaKey);
     });
-    plugin.registerDomEvent(doc, "focusin", (event) => this.enter(event.target));
+    plugin.registerDomEvent(doc, "focusin", (event) => this.enter(event.target, true));
     plugin.registerDomEvent(doc, "pointerout", (event) => this.leave(event.relatedTarget));
     plugin.registerDomEvent(doc, "focusout", (event) => this.leave(event.relatedTarget));
     plugin.registerDomEvent(doc, "click", (event) => {
@@ -67006,28 +67157,43 @@ var ReferencePreviews = class {
       const modal = new import_obsidian4.Modal(plugin.app);
       this.modal = modal;
       modal.titleEl.setText(t("\u5F15\u7528\u5185\u5BB9\u9884\u89C8"));
-      renderReferencePreview(plugin, modal.contentEl, target, () => modal.close());
+      try {
+        renderReferencePreview(plugin, modal.contentEl, target, () => modal.close());
+      } catch (error) {
+        plugin.recordError(t("\u5F15\u7528\u5185\u5BB9\u9884\u89C8"), error);
+        modal.close();
+        return;
+      }
       modal.onClose = () => {
         if (this.modal === modal) this.modal = void 0;
       };
       modal.open();
     }, true);
     plugin.registerDomEvent(doc, "keydown", (event) => {
-      if (event.key === "Escape") this.hide(true);
-      else if (event.key === "Enter" && this.find(event.target)) this.hide();
+      if (event.key === "Escape") {
+        this.hide(true);
+        return;
+      }
+      if (event.key === "Enter") {
+        if (this.find(event.target)) this.hide();
+        return;
+      }
+      if (!this.card || !this.anchor || !event.ctrlKey && !event.metaKey) return;
+      const target = previewTarget(plugin, this.anchor);
+      if (target && prefersNativePreview(target, nativePreviewAvailable(plugin), { requiredModifier: nativePreviewRequiresModifier(plugin, this.anchor), modifier: true })) this.hide();
     }, true);
     plugin.register(() => this.destroy());
   }
   find(node) {
     return node?.closest?.("a[data-an-target],a[data-an-eqref]") || null;
   }
-  enter(node) {
+  enter(node, focused = false, modifier = false) {
     if (this.restoringFocus || !this.plugin.settings.referencePreview || node?.closest(".an-reference-preview")) return;
     const anchor = this.find(node);
     if (!anchor || anchor === this.anchor && this.card) return;
     this.clear();
     this.timer = this.doc.defaultView.setTimeout(() => {
-      if (anchor.isConnected) this.show(anchor);
+      if (anchor.isConnected) this.show(anchor, focused, modifier);
     }, 250);
   }
   leave(next) {
@@ -67042,14 +67208,23 @@ var ReferencePreviews = class {
     if (this.timer !== void 0) this.doc.defaultView.clearTimeout(this.timer);
     this.timer = void 0;
   }
-  show(anchor) {
+  show(anchor, focused = false, modifier = false) {
     const target = previewTarget(this.plugin, anchor);
-    if (!target) return;
+    if (!target || !focused && prefersNativePreview(target, nativePreviewAvailable(this.plugin), { requiredModifier: nativePreviewRequiresModifier(this.plugin, anchor), modifier })) {
+      this.hide();
+      return;
+    }
     this.hide();
     this.anchor = anchor;
     const card = this.doc.body.createDiv({ cls: "an-reference-popover", attr: { role: "dialog", "aria-label": t("\u5F15\u7528\u5185\u5BB9\u9884\u89C8") } });
     this.card = card;
-    renderReferencePreview(this.plugin, card, target, () => this.hide(true));
+    try {
+      renderReferencePreview(this.plugin, card, target, () => this.hide(true));
+    } catch (error) {
+      this.plugin.recordError(t("\u5F15\u7528\u5185\u5BB9\u9884\u89C8"), error);
+      this.hide();
+      return;
+    }
     const bounds = anchor.getBoundingClientRect(), viewport = this.doc.documentElement;
     card.style.left = Math.max(8, Math.min(bounds.left, viewport.clientWidth - card.offsetWidth - 8)) + "px";
     card.style.top = Math.max(8, Math.min(bounds.bottom + 8, viewport.clientHeight - card.offsetHeight - 8)) + "px";
@@ -67072,6 +67247,113 @@ var ReferencePreviews = class {
     this.modal = void 0;
   }
 };
+
+// src/indexing/native-blocks.ts
+var copy = (loc) => ({ line: loc.line, col: loc.col, offset: loc.offset });
+var assign2 = (target, loc) => {
+  target.line = loc.line;
+  target.col = loc.col;
+  target.offset = loc.offset;
+};
+var same = (a, b) => !!a && !!b && a.start.line === b.start.line && a.start.col === b.start.col && a.start.offset === b.start.offset && a.end.line === b.end.line && a.end.col === b.end.col && a.end.offset === b.end.offset;
+function nativeBlockSpan(note, record) {
+  const line = record.line, endLine = record.endLine;
+  return {
+    start: { line, col: 0, offset: note.starts[line] },
+    end: { line: endLine, col: note.lines[endLine].length, offset: note.starts[endLine] + note.lines[endLine].length }
+  };
+}
+var exactKey = (blocks, id2) => Object.hasOwn(blocks, id2) ? id2 : void 0;
+function foldedKey(blocks, id2) {
+  const lower = id2.toLowerCase();
+  return Object.keys(blocks).find((key2) => key2.toLowerCase() === lower);
+}
+function restoreEntry(blocks, id2, entry) {
+  const key2 = exactKey(blocks, id2), current2 = key2 ? blocks[key2] : void 0;
+  if (!key2 || !current2 || !current2.position) return false;
+  if (entry.object && entry.object !== current2) return false;
+  if (entry.patched && !same(current2.position, entry.patched)) return false;
+  if (!entry.existed) {
+    if (current2.anSynthetic !== true) return false;
+    if (current2.id === id2) {
+      delete blocks[key2];
+      return true;
+    }
+    return false;
+  }
+  if (!entry.position) return false;
+  assign2(current2.position.start, entry.position.start);
+  assign2(current2.position.end, entry.position.end);
+  return true;
+}
+function patchNativeBlocks(cache, note, save) {
+  if (!cache.blocks && ![...note.blocks.values()].some(Boolean)) {
+    save.entries.clear();
+    save.patched = void 0;
+    return false;
+  }
+  const blocks = cache.blocks ?? (cache.blocks = {});
+  if (save.blocks && save.blocks !== blocks) {
+    save.entries.clear();
+    save.patched = void 0;
+  }
+  save.blocks = blocks;
+  let changed = false, ids = /* @__PURE__ */ new Set();
+  for (const [id2, record] of note.blocks) {
+    if (!record || record.line < 0 || record.endLine < record.line || record.endLine >= note.lines.length) continue;
+    ids.add(id2);
+    const key2 = exactKey(blocks, id2), current2 = key2 ? blocks[key2] : void 0;
+    if (!key2 && foldedKey(blocks, id2)) {
+      save.entries.delete(id2);
+      continue;
+    }
+    if (current2 && !current2.position) {
+      save.entries.delete(id2);
+      continue;
+    }
+    if (!save.entries.has(id2)) {
+      save.entries.set(id2, current2 ? { existed: true, position: { start: copy(current2.position.start), end: copy(current2.position.end) }, object: current2 } : { existed: false });
+    }
+    const entry = save.entries.get(id2), span = nativeBlockSpan(note, record);
+    if (entry.patched && current2 && (entry.object !== current2 || !same(current2.position, entry.patched))) {
+      entry.existed = true;
+      entry.position = { start: copy(current2.position.start), end: copy(current2.position.end) };
+      entry.object = current2;
+      delete current2.anSynthetic;
+    } else if (entry.patched && !current2) {
+      entry.existed = false;
+      entry.object = void 0;
+    }
+    entry.patched = { start: copy(span.start), end: copy(span.end) };
+    if (current2) {
+      entry.object = current2;
+      if (current2.position.start.line !== span.start.line || current2.position.start.col !== span.start.col || current2.position.start.offset !== span.start.offset || current2.position.end.line !== span.end.line || current2.position.end.col !== span.end.col || current2.position.end.offset !== span.end.offset) {
+        assign2(current2.position.start, span.start);
+        assign2(current2.position.end, span.end);
+        changed = true;
+      }
+    } else {
+      const created = { id: id2, position: { start: copy(span.start), end: copy(span.end) } };
+      Object.defineProperty(blocks, id2, { value: created, enumerable: true, configurable: true, writable: true });
+      created.anSynthetic = true;
+      entry.object = created;
+      changed = true;
+    }
+  }
+  for (const id2 of [...save.entries.keys()]) {
+    if (ids.has(id2)) continue;
+    if (restoreEntry(blocks, id2, save.entries.get(id2))) changed = true;
+    save.entries.delete(id2);
+  }
+  return changed;
+}
+function restoreNativeBlocks(save) {
+  const blocks = save.blocks ?? save.cache.blocks;
+  if (!blocks) return false;
+  let changed = false;
+  for (const [id2, entry] of save.entries) if (restoreEntry(blocks, id2, entry)) changed = true;
+  return changed;
+}
 
 // src/export/math-links.ts
 function prepareMathLinks(root, graph2, path) {
@@ -67427,67 +67709,6 @@ var palettes_default = {
     }
   }
 };
-
-// src/rendering/custom-appearance.ts
-var drawing = (paths) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" stroke="black" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
-var MOTIFS = {
-  laurel: drawing('<path d="M23 41C8 35 5 19 16 7M25 41C40 35 43 19 32 7M14 12Q5 12 9 20Q16 20 14 12M10 23Q2 25 10 31Q17 28 10 23M15 33Q10 40 20 40Q23 34 15 33M34 12Q43 12 39 20Q32 20 34 12M38 23Q46 25 38 31Q31 28 38 23M33 33Q38 40 28 40Q25 34 33 33"/><path d="M19 23l4 4 7-9M18 43l6-3 6 3"/>'),
-  compass: drawing('<circle cx="24" cy="24" r="17"/><circle cx="24" cy="24" r="13" stroke-dasharray="1 4"/><path d="M24 3v6m0 30v6M3 24h6m30 0h6M30 15l-3 12-12 6 6-12zM21 21l6 6"/><circle cx="24" cy="24" r="2"/>'),
-  rosette: drawing('<path d="M24 5C30 14 37 7 35 17C46 17 38 26 42 30C32 31 35 41 25 37C18 46 16 34 8 37C11 28 1 27 9 20C5 12 18 16 17 7Z"/><circle cx="24" cy="24" r="9"/><circle cx="24" cy="24" r="5"/><path d="M21 24l2 2 4-5"/>'),
-  orbit: drawing('<circle cx="24" cy="24" r="3"/><ellipse cx="24" cy="24" rx="20" ry="8" transform="rotate(-35 24 24)"/><ellipse cx="24" cy="24" rx="20" ry="8" transform="rotate(35 24 24)"/><ellipse cx="24" cy="24" rx="8" ry="20"/><circle cx="39" cy="12" r="2" fill="black"/>'),
-  lattice: drawing('<path d="M24 4l17 10v20L24 44 7 34V14ZM7 14l17 10 17-10M24 24v20M24 4v20M7 34l17-10 17 10"/><path d="M15 9v20l17 10M33 9v20L16 39M7 24l17 10 17-10"/>'),
-  knot: drawing('<path d="M24 6C11-5 0 14 13 23l12 10C38 44 49 25 36 16L24 6ZM24 42C37 53 48 34 35 25L23 15C10 4-1 23 12 32l12 10Z" transform="translate(5 5) scale(.79)"/><path d="M16 18l16 12M16 30l16-12"/>'),
-  arch: drawing('<path d="M7 41h34M10 37V23a14 14 0 0128 0v14M15 37V23a9 9 0 0118 0v14M19 37V24a5 5 0 0110 0v13M8 37h9m14 0h9M24 5v5M13 10l4 5m18-5l-4 5M8 20l7 2m25-2l-7 2"/>'),
-  quill: drawing('<path d="M8 41l24-27M13 34C7 17 27 5 41 6C39 22 29 35 13 34ZM20 27l-2-10m9 2l-1-9M20 27l12-1M27 19l10-1M8 42h19"/><path d="M32 36h8m-6 4h8"/>'),
-  folio: drawing('<path d="M24 12C18 7 11 8 5 10v27c7-2 13-1 19 3 6-4 12-5 19-3V10c-6-2-13-3-19 2ZM24 12v28M9 15c4-1 7 0 11 2M9 21c4-1 7 0 11 2M9 27c4-1 7 0 11 2M28 17c4-2 7-3 11-2M28 23c4-2 7-3 11-2M28 29c4-2 7-3 11-2"/>')
-};
-function parseAppearance(raw, roles = Object.keys(engine_default.APPEARANCE_TYPES)) {
-  const result = {};
-  try {
-    if (raw.length > 2e4) return result;
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return result;
-    for (const key2 of roles) {
-      const entry = parsed[key2];
-      if (!entry || typeof entry !== "object") continue;
-      const clean = {};
-      for (const field of ["light", "dark", "motifLight", "motifDark"]) {
-        const color = entry[field];
-        if (typeof color === "string" && /^#[0-9a-f]{6}$/i.test(color)) clean[field] = color;
-      }
-      const motif = entry.motif;
-      if (typeof motif === "string" && (Object.hasOwn(MOTIFS, motif) || motif === "none")) clean.motif = motif;
-      result[key2] = clean;
-    }
-  } catch {
-  }
-  return result;
-}
-function motifMask(id2) {
-  return Object.hasOwn(MOTIFS, id2) ? `url("data:image/svg+xml,${encodeURIComponent(MOTIFS[id2])}")` : "none";
-}
-function titleInk(hex) {
-  const rgb = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
-  const luminance = rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
-  return luminance > 0.179 ? "#000000" : "#ffffff";
-}
-var appearanceVariables = Object.keys(engine_default.APPEARANCE_TYPES).flatMap((key2) => ["color", "ink", "motif-color", "symbol", "motif-display"].map((part) => `--an-${part}-${key2}`));
-function appearanceValues(raw, dark, roles = Object.keys(engine_default.APPEARANCE_TYPES)) {
-  const values = {};
-  for (const [key2, entry] of Object.entries(parseAppearance(raw, roles))) {
-    const color = dark ? entry.dark : entry.light, motifColor = dark ? entry.motifDark : entry.motifLight;
-    if (color) {
-      values[`--an-color-${key2}`] = color;
-      values[`--an-ink-${key2}`] = titleInk(color);
-    }
-    if (motifColor) values[`--an-motif-color-${key2}`] = motifColor;
-    if (entry.motif) {
-      values[`--an-symbol-${key2}`] = motifMask(entry.motif);
-      values[`--an-motif-display-${key2}`] = entry.motif === "none" ? "none" : "block";
-    }
-  }
-  return values;
-}
 
 // src/rendering/palettes.ts
 var PRESETS = palettes_default;
@@ -68173,6 +68394,7 @@ var DEFAULTS2 = {
   exportFolder: "_exports",
   livePreview: true,
   referencePreview: true,
+  referencePreviewRowOnly: true,
   maintainReferencePaths: true,
   referenceManualFirst: false,
   lightPalette: "forest",
@@ -69705,12 +69927,28 @@ function createLiveParagraphExtension(plugin) {
     constructor(view) {
       this.view = view;
       this.destroyed = false;
+      this.composing = false;
+      this.compositionPending = false;
       this.start = () => {
-        this.view.dispatch({ effects: composing.of(true) });
+        if (this.destroyed || !this.decorated || this.compositionPending) return;
+        this.compositionPending = true;
+        this.view.dom.ownerDocument.win.setTimeout(() => {
+          if (this.destroyed || !this.compositionPending || this.composing) return;
+          this.composing = true;
+          this.view.dispatch({ effects: composing.of(true) });
+        }, 0);
       };
       this.end = () => {
-        this.view.dispatch({ effects: composing.of(false) });
-        this.schedule();
+        if (this.destroyed || !this.compositionPending && !this.composing) return;
+        this.compositionPending = false;
+        this.view.dom.ownerDocument.win.setTimeout(() => {
+          if (this.destroyed || this.compositionPending) return;
+          if (this.composing) {
+            this.composing = false;
+            this.view.dispatch({ effects: composing.of(false) });
+          }
+          this.schedule();
+        }, 0);
       };
       this.fonts = () => this.schedule();
       this.idle = editorIdleScheduler(view.dom, () => this.requestLayout(), 90);
@@ -69725,6 +69963,9 @@ function createLiveParagraphExtension(plugin) {
       view.dom.ownerDocument.fonts?.addEventListener("loadingdone", this.fonts);
       this.schedule();
     }
+    get decorated() {
+      return !!this.view.state.field(import_obsidian6.editorLivePreviewField, false) && !plugin.previewPaused && (plugin.settings.kpLivePreview || plugin.settings.paragraphIndent);
+    }
     update(update) {
       if (update.docChanged || update.selectionSet || update.viewportChanged || update.transactions.some((tr) => tr.effects.some((effect) => effect.is(plugin.refreshEffect)))) this.schedule();
     }
@@ -69732,15 +69973,16 @@ function createLiveParagraphExtension(plugin) {
       this.idle.schedule();
     }
     requestLayout() {
-      if (this.destroyed) return;
+      if (this.destroyed || this.compositionPending || this.composing || this.view.composing || this.view.compositionStarted) return;
+      if (plugin.previewPaused || !this.view.state.field(import_obsidian6.editorLivePreviewField, false) || !plugin.settings.kpLivePreview && !plugin.settings.paragraphIndent) return;
       this.view.requestMeasure({ key: this, read: (view) => ({ doc: view.state.doc, plans: this.measure(view) }), write: (result) => {
         queueMicrotask(() => {
-          if (!this.destroyed && this.idle.isIdle() && this.view.state.doc === result.doc) this.view.dispatch({ effects: measured.of(result.plans) });
+          if (!this.destroyed && this.idle.isIdle() && !this.compositionPending && !this.composing && !this.view.composing && !this.view.compositionStarted && this.view.state.doc === result.doc) this.view.dispatch({ effects: measured.of(result.plans) });
         });
       } });
     }
     measure(view) {
-      if (!enabled(view.state) || view.composing || view.state.field(field).composing) return [];
+      if (this.compositionPending || this.composing || !enabled(view.state) || view.composing || view.compositionStarted || view.state.field(field).composing) return [];
       const context = view.dom.ownerDocument.win.createEl("canvas").getContext("2d");
       if (!context) return [];
       const plans = [];
@@ -70002,10 +70244,10 @@ function shared(settings) {
   };
 }
 function exportProfile(settings) {
-  const copy = { ...settings };
-  engine_default.migrateReferenceFormats(copy);
-  migratePaletteSettings(copy);
-  return JSON.stringify({ kind: "academic-notes-style", version: 1, settings: shared(copy) }, null, 2);
+  const copy2 = { ...settings };
+  engine_default.migrateReferenceFormats(copy2);
+  migratePaletteSettings(copy2);
+  return JSON.stringify({ kind: "academic-notes-style", version: 1, settings: shared(copy2) }, null, 2);
 }
 function parseProfile(raw) {
   if (raw.length > 7e5) throw new Error(t("\u65B9\u6848\u6587\u4EF6\u8FC7\u5927\uFF0C\u6700\u591A\u5141\u8BB8 700 KB \u6587\u672C\u3002"));
@@ -71381,6 +71623,7 @@ var AcademicSettings = class extends import_obsidian12.PluginSettingTab {
     select("sectionNumberSource", t("H2 \u8282\u53F7\u6765\u6E90"), { order: t("\u6309 H2 \u51FA\u73B0\u987A\u5E8F\uFF1A1\u30012\u30013"), heading: t("\u4F18\u5148\u4F7F\u7528\u6807\u9898\u5F00\u5934\u7684\u6570\u5B57") }, t("\u53EA\u8BFB\u6E90\u7801\u4E2D\u7684 H2\uFF0C\u4E0D\u8BA1 H3\u3001H6 \u6216\u4EE3\u7801\u5757\u91CC\u7684\u6807\u9898\u3002"));
     toggle("maintainReferencePaths", t("\u6539\u540D\u65F6\u7EF4\u62A4\u5B66\u672F\u5F15\u7528"), t("\u7B14\u8BB0\u6216\u6587\u4EF6\u5939\u6539\u540D\u540E\u66F4\u65B0 LaTeX \u5F15\u7528\u548C\u5408\u8BA2\u672C\u7AE0\u8282\u8DEF\u5F84\u3002"));
     toggle("referencePreview", t("\u5F15\u7528\u5185\u5BB9\u9884\u89C8"), t("\u684C\u9762\u60AC\u505C\u6216\u805A\u7126\u663E\u793A\u9884\u89C8\uFF0C\u79FB\u52A8\u7AEF\u70B9\u6309\u540E\u9009\u62E9\u8DF3\u8F6C\u3002"));
+    toggle("referencePreviewRowOnly", t("\u591A\u884C\u516C\u5F0F\u9884\u89C8\u53EA\u663E\u793A\u76EE\u6807\u884C"), t("\u5173\u95ED\u65F6\u663E\u793A\u6574\u4E2A\u516C\u5F0F\u5757\uFF1B\u4EC5\u5728\u5F15\u7528\u591A\u884C\u73AF\u5883\u4E2D\u7684\u67D0\u4E00\u884C\u6807\u7B7E\u65F6\u751F\u6548\u3002"));
     toggle("referenceManualFirst", t("\u5F15\u7528\u5019\u9009\u4F18\u5148\u663E\u793A\u624B\u52A8\u7F16\u53F7"), t("\u9ED8\u8BA4\u6309\u6587\u4EF6\u548C\u6B63\u6587\u987A\u5E8F\u6392\u5217\uFF1B\u5F00\u542F\u540E\u4F18\u5148\u663E\u793A\u624B\u52A8\u7F16\u53F7\u5BF9\u8C61\uFF0C\u7CBE\u786E\u6807\u7B7E\u5339\u914D\u59CB\u7EC8\u4F18\u5148\u3002"));
     toggle("shortReferences", t("\u94FE\u63A5\u5F15\u7528\u4F7F\u7528\u7F29\u5199"), t("\u6807\u9898\u4ECD\u4E3A Theorem / Definition\uFF1B\u94FE\u63A5\u663E\u793A thm 2.1 / def 2.1\u3002"));
     toggle("mediaNumbered", t("\u56FE\u3001\u8868\u548C\u5B50\u56FE\u81EA\u52A8\u7F16\u53F7"), t("\u7528 [!figure] / [!table]\uFF1B\u5D4C\u5957 [!subfigure] \u5F97\u5230 (a)\u3001(b)\u3002\u5B89\u88C5\u540E\u5373\u53EF\u4F7F\u7528\u5185\u7F6E\u56FE\u8868\u6837\u5F0F\u3002"));
@@ -72293,9 +72536,9 @@ var DiagramEditor = class {
       this.remember();
       let n = 1;
       while (this.data.arrows.some((a2) => a2.id === "a-" + n)) n++;
-      const copy = { ...a, id: "a-" + n, label: "", curve: 0, side: a.side === "above" ? "below" : "above" };
-      this.data.arrows.push(copy);
-      this.selectedArrow = copy.id;
+      const copy2 = { ...a, id: "a-" + n, label: "", curve: 0, side: a.side === "above" ? "below" : "above" };
+      this.data.arrows.push(copy2);
+      this.selectedArrow = copy2.id;
       this.refresh();
     });
     const remove = fields.createEl("button", { text: t("\u5220\u9664\u5F53\u524D\u7BAD\u5934"), attr: { "data-an-action": "remove-arrow" } });
@@ -72613,6 +72856,8 @@ var AcademicNotes = class extends import_obsidian16.Plugin {
     this.readerUnloads = /* @__PURE__ */ new Set();
     this.paragraphLayouts = /* @__PURE__ */ new Set();
     this.parsed = /* @__PURE__ */ new Map();
+    this.nativeBlockSaves = /* @__PURE__ */ new Map();
+    this.refreshRetries = /* @__PURE__ */ new Map();
     this.dirty = /* @__PURE__ */ new Map();
     this.pdfJobs = /* @__PURE__ */ new Set();
     this.layoutWrite = Promise.resolve();
@@ -72632,6 +72877,8 @@ var AcademicNotes = class extends import_obsidian16.Plugin {
     this.readerUnloads = /* @__PURE__ */ new Set();
     this.paragraphLayouts = /* @__PURE__ */ new Set();
     this.parsed = /* @__PURE__ */ new Map();
+    this.nativeBlockSaves = /* @__PURE__ */ new Map();
+    this.refreshRetries = /* @__PURE__ */ new Map();
     this.dirty = /* @__PURE__ */ new Map();
     this.pdfJobs = /* @__PURE__ */ new Set();
     try {
@@ -72765,6 +73012,9 @@ var AcademicNotes = class extends import_obsidian16.Plugin {
   }
   onunload() {
     this.active = false;
+    for (const pending2 of this.refreshRetries.values()) window.clearTimeout(pending2.timer);
+    this.refreshRetries.clear();
+    for (const path of [...this.nativeBlockSaves.keys()]) this.restoreNativeBlockSave(path);
     if (this.layoutDiagnostics?.running && this.layoutDiagnosticPath) {
       void this.saveLayoutDiagnostics(this.layoutDiagnostics.stop(), this.layoutDiagnosticPath).catch(() => {
       });
@@ -72814,14 +73064,48 @@ var AcademicNotes = class extends import_obsidian16.Plugin {
   }
   togglePreviewPause() {
     this.previewPaused = !this.previewPaused;
-    for (const view of this.editorViews) {
+    for (const view of this.editorViews) this.refreshEditor(view, ++this.revision);
+    new import_obsidian16.Notice(t(this.previewPaused ? "\u5DF2\u6682\u505C\u672C\u6B21\u4F1A\u8BDD\u7684\u5B9E\u65F6\u9884\u89C8\u589E\u5F3A\uFF1B\u9605\u8BFB\u4E0E\u5BFC\u51FA\u4E0D\u53D7\u5F71\u54CD\u3002" : "\u5DF2\u6062\u590D\u5B9E\u65F6\u9884\u89C8\u589E\u5F3A\u3002"));
+  }
+  /** Never dispatch while an IME composition is active: the host commits it on compositionend. */
+  refreshEditor(view, revision) {
+    if (!this.active) return;
+    const pending2 = this.refreshRetries.get(view);
+    if (pending2) {
+      pending2.revision = revision;
+      return;
+    }
+    const run = () => {
+      if (!this.active || !this.editorViews.has(view)) return;
       try {
-        view.dispatch({ effects: this.refreshEffect.of(++this.revision) });
+        view.dispatch({ effects: this.refreshEffect.of(revision) });
       } catch (error) {
         this.recordError(t("\u5237\u65B0\u7F16\u8F91\u5668"), error);
       }
+    };
+    if (!view.composing && !view.compositionStarted) {
+      run();
+      return;
     }
-    new import_obsidian16.Notice(t(this.previewPaused ? "\u5DF2\u6682\u505C\u672C\u6B21\u4F1A\u8BDD\u7684\u5B9E\u65F6\u9884\u89C8\u589E\u5F3A\uFF1B\u9605\u8BFB\u4E0E\u5BFC\u51FA\u4E0D\u53D7\u5F71\u54CD\u3002" : "\u5DF2\u6062\u590D\u5B9E\u65F6\u9884\u89C8\u589E\u5F3A\u3002"));
+    const entry = { revision, timer: 0 };
+    const step = () => {
+      if (!this.active || !this.editorViews.has(view)) {
+        this.refreshRetries.delete(view);
+        return;
+      }
+      if (view.composing || view.compositionStarted) {
+        entry.timer = window.setTimeout(step, 50);
+        return;
+      }
+      this.refreshRetries.delete(view);
+      try {
+        view.dispatch({ effects: this.refreshEffect.of(entry.revision) });
+      } catch (error) {
+        this.recordError(t("\u5237\u65B0\u7F16\u8F91\u5668"), error);
+      }
+    };
+    entry.timer = window.setTimeout(step, 50);
+    this.refreshRetries.set(view, entry);
   }
   applyAppearance() {
     if (!this.active)
@@ -72914,16 +73198,18 @@ var AcademicNotes = class extends import_obsidian16.Plugin {
       if (!this.active)
         return;
       const paths = new Set(files.map((f) => f.path));
-      for (const p of this.parsed.keys())
+      for (const p of [...this.parsed.keys()])
         if (!paths.has(p)) {
           this.parsed.delete(p);
           changed = true;
           this.renderStates.delete(p);
+          this.restoreNativeBlockSave(p);
         }
       if (changed) {
         this.graph = engine_default.graph(notes, this.settings, (n, h) => this.resolver(n, h));
         metrics.graphRebuilt = true;
       }
+      for (const note of notes) this.patchNoteBlocks(note);
       const affected = /* @__PURE__ */ new Set(), allViews = renderKey !== this.renderKey;
       for (const note of notes) {
         const labels = JSON.stringify([
@@ -72958,11 +73244,7 @@ var AcademicNotes = class extends import_obsidian16.Plugin {
       for (const view of this.editorViews) {
         const path = view.state.field(Obs2.editorInfoField, false)?.file?.path;
         if (path && !affected.has(path)) continue;
-        try {
-          view.dispatch({ effects: this.refreshEffect.of(this.revision) });
-        } catch (e) {
-          this.recordError(t("\u5237\u65B0\u7F16\u8F91\u5668"), e);
-        }
+        this.refreshEditor(view, this.revision);
       }
       metrics.durationMs = Math.round(performance.now() - started);
       this.indexMetrics = metrics;
@@ -72975,6 +73257,59 @@ var AcademicNotes = class extends import_obsidian16.Plugin {
         this.rerun = false;
         this.scheduleIndex();
       }
+    }
+  }
+  /**
+   * Obsidian's metadata cache attaches an ID in a callout to the outermost
+   * callout, and omits IDs on callout title lines and standalone quoted lines.
+   * Align its block positions with our records so Page preview and native block
+   * navigation show the lemma/equation instead of the enclosing theorem.
+   */
+  patchNoteBlocks(note) {
+    const file = this.app.vault.getAbstractFileByPath(note.path);
+    if (!(file instanceof import_obsidian16.TFile))
+      return;
+    const cache = this.app.metadataCache.getFileCache(file);
+    if (!cache)
+      return;
+    let save = this.nativeBlockSaves.get(note.path);
+    const hasRecords = [...note.blocks.values()].some(Boolean);
+    if (hasRecords && note._blocks !== void 0 && save && save.cache === cache && save.blocks === cache.blocks && save.patched === note._blocks && note._nativePatched === note._blocks)
+      return;
+    if (!hasRecords && !save) {
+      note._nativePatched = note._blocks;
+      return;
+    }
+    if (save && save.cache !== cache) {
+      if (save.blocks === cache.blocks) save.cache = cache;
+      else save = void 0;
+    }
+    if (!save || save.blocks !== cache.blocks) {
+      save = { cache, blocks: cache.blocks, entries: /* @__PURE__ */ new Map() };
+      this.nativeBlockSaves.set(note.path, save);
+    }
+    if (hasRecords && note._blocks !== void 0 && save.patched === note._blocks && note._nativePatched === note._blocks)
+      return;
+    try {
+      if (patchNativeBlocks(cache, note, save))
+        note._blocks = JSON.stringify(cache.blocks || {});
+      save.patched = note._blocks;
+      note._nativePatched = note._blocks;
+      if (!save.entries.size)
+        this.nativeBlockSaves.delete(note.path);
+    } catch (error) {
+      this.recordError(t("\u4FEE\u6B63\u539F\u751F\u5757\u4F4D\u7F6E"), error);
+    }
+  }
+  restoreNativeBlockSave(path) {
+    const save = this.nativeBlockSaves.get(path);
+    if (!save)
+      return;
+    this.nativeBlockSaves.delete(path);
+    try {
+      restoreNativeBlocks(save);
+    } catch (error) {
+      this.recordError(t("\u6062\u590D\u539F\u751F\u5757\u4F4D\u7F6E"), error);
     }
   }
   postprocess(el, ctx) {

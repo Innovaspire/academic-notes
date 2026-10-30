@@ -26,6 +26,9 @@ import { DEFAULTS as PluginDefaults } from '../src/settings';
 import { diagramDeletionRange } from '../src/ui/diagram-modal';
 import { mathContinuationLines } from '../src/typography/continuations';
 import { proseLines } from '../src/typography/prose';
+import { labelInsertion } from '../src/workspace/notes';
+import { nativeBlockSpan, patchNativeBlocks, restoreNativeBlocks } from '../src/indexing/native-blocks';
+import { previewTarget, prefersNativePreview, nativePreviewAvailable, nativePreviewRequiresModifier } from '../src/ui/reference-preview';
 import { EditorState } from '@codemirror/state';
 
 test('visual prose indentation excludes Markdown structures and detects paragraph starts', () => {
@@ -388,6 +391,9 @@ test('a label colliding with a native block ID on another target is ambiguous', 
   const graph = Engine.graph([note]);
   assert.equal(note.blocks.get('valid'), null);
   assert.equal(graph.resolve('#^valid', 'collide.md'), null);
+  // A stale link from a note that is no longer in the graph must not throw.
+  assert.equal(graph.resolve('#^valid', 'outside.md'), null);
+  assert.equal(graph.resolveLabel('valid', 'outside.md'), null);
   assert.equal(note.refs[0].target, null);
   assert.ok(graph.warnings.some(w => w.includes('valid')));
 });
@@ -515,6 +521,171 @@ test('subfigure IDs bind to their own nested declarations', () => {
   assert.equal(note.blocks.get('fig-initial')?.number, '1.1(a)');
   assert.equal(note.blocks.get('fig-final')?.number, '1.1(b)');
   assert.equal(note.blocks.get('fig-states')?.kind, 'figure');
+});
+
+test('inline block IDs on nested callouts bind to the environment that owns the line', () => {
+  const source = [
+    '> [!theorem] Outer',
+    '> See [[#^thm-a]], [[#^pf-a]], [[#^lem-a]]. ^thm-a',
+    '>',
+    '> > [!proof]',
+    '> > Proof body. ^pf-a',
+    '> >',
+    '> > > [!lemma] Nested',
+    '> > > Lemma body. ^lem-a'
+  ].join('\n');
+  const note = Engine.parse('nested.md', source); const graph = Engine.graph([note]);
+  assert.equal(note.blocks.get('thm-a')?.key, 'thm');
+  assert.equal(note.blocks.get('pf-a')?.key, 'proof');
+  assert.equal(note.blocks.get('lem-a')?.key, 'lem');
+  assert.deepEqual(note.refs.map(r => r.target?.key), ['thm', 'proof', 'lem']);
+  assert.equal(Engine.refText(note.blocks.get('thm-a'), {}, 'thm-a'), 'thm 1');
+  assert.equal(Engine.refText(note.blocks.get('lem-a'), {}, 'lem-a'), 'lem 1');
+  assert.equal(graph.resolve('#^lem-a', 'nested.md')?.line, 6);
+  // A label on a middle line still belongs to the environment whose body owns it.
+  const middle = Engine.parse('middle.md', '> [!lemma] L\n> First paragraph. ^mid\n>\n> Second paragraph.');
+  Engine.graph([middle]);
+  assert.equal(middle.blocks.get('mid')?.key, 'lem');
+  // Sibling nested environments keep their own labels.
+  const siblings = Engine.parse('siblings.md', '> [!proof]\n> P\n>\n> > [!lemma] A\n> > a ^a\n>\n> > [!lemma] B\n> > b ^b');
+  Engine.graph([siblings]);
+  assert.equal(siblings.blocks.get('a')?.line, 3);
+  assert.equal(siblings.blocks.get('b')?.line, 6);
+  // Arbitrary nesting depth follows the same rule.
+  const deep = Engine.parse('deep.md', '> [!thm] T\n> a ^t\n>\n> > [!proof]\n> > b ^p\n> >\n> > > [!lemma] L1\n> > > c ^l1\n> > >\n> > > > [!lemma] L2\n> > > > d ^l2');
+  Engine.graph([deep]);
+  assert.deepEqual(['t', 'p', 'l1', 'l2'].map(id => deep.blocks.get(id)?.line), [0, 3, 6, 9]);
+  // Title-line labels are unchanged, and non-nested inline labels still work.
+  const titles = Engine.parse('titles.md', '> [!thm] T ^t\n> T\n>\n> > [!lem] L ^l\n> > L');
+  Engine.graph([titles]);
+  assert.equal(titles.blocks.get('t')?.line, 0);
+  assert.equal(titles.blocks.get('l')?.line, 3);
+  const plain = Engine.parse('plain.md', '> [!lemma] Lemma\n> Body ^plain-inline');
+  Engine.graph([plain]);
+  assert.equal(plain.blocks.get('plain-inline')?.key, 'lem');
+  // A standalone ID inside plain nested quote content still belongs to the
+  // enclosing environment.
+  const quoted = Engine.parse('quoted.md', '> [!thm] T\n> T\n>\n> > aside\n> > ^quoted-id');
+  Engine.graph([quoted]);
+  assert.equal(quoted.blocks.get('quoted-id')?.key, 'thm');
+  // Manual and shared counters keep the outer and inner numbers correct.
+  const manual = Engine.parse('manual.md', '> [!theorem|2.1] T\n> T ^tm\n>\n> > [!lemma|2.2] L\n> > L ^lm');
+  Engine.graph([manual]);
+  assert.equal(Engine.refText(manual.blocks.get('tm'), {}, 'tm'), 'thm 2.1');
+  assert.equal(Engine.refText(manual.blocks.get('lm'), {}, 'lm'), 'lem 2.2');
+  const shared = Engine.parse('shared.md', '> [!theorem] T\n> T ^ts\n>\n> > [!lemma] L\n> > L ^ls');
+  Engine.graph([shared], { sharedCounter: true });
+  assert.equal(Engine.refText(shared.blocks.get('ts'), {}, 'ts'), 'thm 1');
+  assert.equal(Engine.refText(shared.blocks.get('ls'), {}, 'ls'), 'lem 2');
+});
+
+test('command-style standalone labels resolve for outer and inner nested environments', () => {
+  let source = '> [!theorem] T\n> T\n>\n> > [!proof]\n> > P\n> >\n> > > [!lemma] L\n> > > L';
+  let note = Engine.parse('cmd.md', source);
+  const lemma = labelInsertion(source, note.records.find(r => r.key === 'lem')!);
+  source = source.slice(0, lemma.at) + lemma.text + source.slice(lemma.at);
+  note = Engine.parse('cmd.md', source);
+  const theorem = labelInsertion(source, note.records.find(r => r.key === 'thm')!);
+  source = source.slice(0, theorem.at) + theorem.text + source.slice(theorem.at);
+  note = Engine.parse('cmd.md', source); Engine.graph([note]);
+  assert.equal(note.blocks.get(lemma.id)?.key, 'lem');
+  assert.equal(note.blocks.get(theorem.id)?.key, 'thm');
+  assert.equal(Engine.refText(note.blocks.get(lemma.id), {}, lemma.id), 'lem 1');
+  assert.equal(Engine.refText(note.blocks.get(theorem.id), {}, theorem.id), 'thm 1');
+  // Media nesting follows the same command flow: label the subfigure, then the figure.
+  let figures = '> [!figure] F\n> ![[a.png]]\n>\n> > [!subfigure] S1\n> > ![[b.png]]';
+  let figureNote = Engine.parse('fig-cmd.md', figures);
+  const sub = labelInsertion(figures, figureNote.records.find(r => r.key === 'subfigure')!);
+  figures = figures.slice(0, sub.at) + sub.text + figures.slice(sub.at);
+  figureNote = Engine.parse('fig-cmd.md', figures);
+  const group = labelInsertion(figures, figureNote.records.find(r => r.key === 'figure')!);
+  figures = figures.slice(0, group.at) + group.text + figures.slice(group.at);
+  figureNote = Engine.parse('fig-cmd.md', figures); Engine.graph([figureNote]);
+  assert.equal(figureNote.blocks.get(sub.id)?.key, 'subfigure');
+  assert.equal(figureNote.blocks.get(group.id)?.key, 'figure');
+  // A label inserted before later quoted content must not close the enclosing callout.
+  const outer = '> [!theorem] T\n> t\n> > [!lemma] L\n> > l\n> tail';
+  const outerNote = Engine.parse('outer.md', outer);
+  const inner = labelInsertion(outer, outerNote.records.find(r => r.key === 'lem')!);
+  const outerText = outer.slice(0, inner.at) + inner.text + outer.slice(inner.at);
+  const repaired = Engine.parse('outer.md', outerText); Engine.graph([repaired]);
+  assert.equal(repaired.blocks.get(inner.id)?.key, 'lem');
+  assert.equal(repaired.callouts.find(r => r.key === 'thm')?.endLine, outerText.split('\n').length - 1);
+  // The same applies to an equation label inside a callout.
+  const equationSource = '> [!theorem] T\n> $$\n> x\n> $$\n> tail';
+  const equationNote = Engine.parse('eq-outer.md', equationSource);
+  const equation = labelInsertion(equationSource, equationNote.records.find(r => r.key === 'equation')!);
+  const equationText = equationSource.slice(0, equation.at) + equation.text + equationSource.slice(equation.at);
+  const equationRepaired = Engine.parse('eq-outer.md', equationText); Engine.graph([equationRepaired]);
+  assert.equal(equationRepaired.blocks.get(equation.id)?.key, 'equation');
+  assert.equal(equationRepaired.callouts.find(r => r.key === 'thm')?.endLine, equationText.split('\n').length - 1);
+  // Every insertion order keeps the bindings and the enclosing callout.
+  for (const order of [['thm', 'proof', 'lem'], ['thm', 'lem', 'proof'], ['proof', 'thm', 'lem'], ['proof', 'lem', 'thm'], ['lem', 'thm', 'proof'], ['lem', 'proof', 'thm']] as const) {
+    let text = '> [!theorem] T\n> t\n> > [!proof] P\n> > p\n> > > [!lemma] L\n> > > l\n> tail';
+    const labels: [string, string][] = [];
+    for (const kind of order) {
+      const insertion = labelInsertion(text, Engine.parse('order.md', text).records.find(r => r.key === kind)!);
+      text = text.slice(0, insertion.at) + insertion.text + text.slice(insertion.at);
+      labels.push([kind, insertion.id]);
+    }
+    const after = Engine.parse('order.md', text); Engine.graph([after]);
+    for (const [kind, id] of labels) assert.equal(after.blocks.get(id)?.key, kind);
+    const tail = text.split('\n').findIndex(line => line.includes('tail'));
+    assert.equal(after.callouts.find(r => r.key === 'thm')?.endLine, tail);
+  }
+});
+
+test('a block ID on the callout title line binds without becoming the title', () => {
+  const note = Engine.parse('title-id.md', '> [!thm] ^thm-title\n> Some Content\n> > [!proof] ^proof-title\n> > Some Content');
+  Engine.graph([note]);
+  assert.equal(note.blocks.get('thm-title')?.key, 'thm');
+  assert.equal(note.blocks.get('proof-title')?.key, 'proof');
+  assert.equal(note.callouts.find(r => r.key === 'thm')?.title, '');
+  assert.equal(note.callouts.find(r => r.key === 'proof')?.title, '');
+  assert.equal(Engine.refText(note.blocks.get('thm-title'), {}, 'thm-title'), 'thm 1');
+  assert.equal(Engine.refText(note.blocks.get('proof-title'), {}, 'proof-title'), 'pf (unnumbered)');
+  // Text before the ID remains the title.
+  const titled = Engine.parse('titled.md', '> [!thm] Real title ^thm-id\n> body');
+  Engine.graph([titled]);
+  assert.equal(titled.callouts[0].title, 'Real title');
+  assert.equal(Engine.refText(titled.blocks.get('thm-id'), {}, 'thm-id'), 'thm 1');
+  // A subfigure whose only title text is its ID stays captionless until referenced.
+  const sub = Engine.parse('sub.md', '> [!figure] Group\n> > [!subfigure] ^sub-id\n> > ![[b.png]]');
+  Engine.graph([sub]);
+  assert.equal(sub.callouts.find(r => r.key === 'subfigure')?.title, '');
+  assert.equal(sub.media.find(r => r.key === 'subfigure')?.number, '');
+});
+
+test('nested block labels cover resumed outer bodies, media, custom and borderline sources', () => {
+  // The outer body can resume after a nested child and keep its own label.
+  const resumed = Engine.parse('resumed.md', ['> [!theorem] T', '> before', '> > [!lemma] L', '> > l ^inner',
+    '> between ^between', '> > [!lemma] L2', '> > l2 ^inner2', '> tail ^tail'].join('\n'));
+  Engine.graph([resumed]);
+  assert.deepEqual(['inner', 'between', 'inner2', 'tail'].map(id => resumed.blocks.get(id)?.key), ['lem', 'thm', 'lem', 'thm']);
+  // Media callouts nested in a theorem keep their own labels.
+  const media = Engine.parse('media.md', ['> [!theorem] T', '> t', '> > [!figure]', '> > ![[a.png]] ^fig',
+    '> > [!table]', '> > | a | ^tab'].join('\n'));
+  Engine.graph([media]);
+  assert.equal(media.blocks.get('fig')?.kind, 'figure');
+  assert.equal(media.blocks.get('tab')?.kind, 'table');
+  // Custom environments use the same depth rule.
+  const custom = { customEnvironments: JSON.stringify({ observation: { name: 'Observation', abbr: 'obs', style: 'thm', numbered: true } }) };
+  const customNote = Engine.parse('custom.md', ['> [!theorem] T', '> > [!observation] O', '> > o ^obs'].join('\n'), {}, custom);
+  Engine.graph([customNote], custom);
+  assert.equal(customNote.blocks.get('obs')?.key, 'observation');
+  // An unrecognised callout does not own the line; the enclosing environment does.
+  const unknown = Engine.parse('unknown.md', ['> [!theorem] T', '> > [!note] N', '> > n ^note'].join('\n'));
+  Engine.graph([unknown]);
+  assert.equal(unknown.blocks.get('note')?.key, 'thm');
+  // A skipped nesting level still follows the line's quote depth.
+  const skipped = Engine.parse('skipped.md', ['> [!thm] T', '> > [!proof] P', '> > > plain ^plain', '> > > > [!lemma] L', '> > > > l ^l'].join('\n'));
+  Engine.graph([skipped]);
+  assert.equal(skipped.blocks.get('plain')?.key, 'proof');
+  assert.equal(skipped.blocks.get('l')?.key, 'lem');
+  // CRLF sources and a final block without a trailing newline parse identically.
+  const crlf = Engine.parse('crlf.md', ['> [!theorem] T', '> > [!lemma] L', '> > l ^l'].join('\r\n'));
+  Engine.graph([crlf]);
+  assert.equal(crlf.blocks.get('l')?.key, 'lem');
 });
 
 test('environment templates preserve unique IDs and figure options preserve numbering', () => {
@@ -760,6 +931,174 @@ test('every curated preset heading keeps readable default text contrast', () => 
     const contrast=preset.mode==='light'?1.05/(luminance+.05):(luminance+.05)/.05;
     assert.ok(contrast>=4.5,preset.name+' heading must be readable');
   }
+});
+
+test('native hover positions point at the nested environment and restore cleanly', () => {
+  const source = ['> [!thm] Outer ^thm-outer', '> outer', '>', '> > [!lemma] Inner', '> > inner', '> > ^lem-inner', '>', '> > [!proof] Proof', '> >', '> > $$', '> > x=1 \\label{eq:x}', '> > $$', '> > ^eq-inner'].join('\n');
+  const note = Engine.parse('native-preview.md', source), originalStart = { line: 0, col: 0, offset: 0 }, originalEnd = { line: 0, col: 0, offset: source.length };
+  const cache: any = { blocks: { 'eq-inner': { id: 'eq-inner', position: { start: originalStart, end: originalEnd } } } }, save = { cache, entries: new Map() }, expectedOriginal = { start: { ...originalStart }, end: { ...originalEnd } };
+  patchNativeBlocks(cache, note, save);
+  for (const id of ['thm-outer', 'lem-inner', 'eq:x', 'eq-inner']) assert.ok(cache.blocks[id], id + ' must be exposed to the native cache');
+  assert.equal(cache.blocks['thm-outer'].position.start.line, 0);
+  assert.equal(cache.blocks['lem-inner'].position.start.line, 3);
+  assert.equal(cache.blocks['eq-inner'].position.start.line, 9);
+  const slice = (id: string) => source.slice(cache.blocks[id].position.start.offset, cache.blocks[id].position.end.offset);
+  assert.ok(slice('lem-inner').startsWith('> > [!lemma] Inner'));
+  assert.ok(slice('eq-inner').startsWith('> > $$') && slice('eq-inner').endsWith('> > $$'));
+  assert.deepEqual(nativeBlockSpan(note, note.blocks.get('eq-inner')!), cache.blocks['eq-inner'].position);
+  restoreNativeBlocks(save);
+  assert.deepEqual(cache.blocks['eq-inner'].position, expectedOriginal);
+  for (const id of ['thm-outer', 'lem-inner', 'eq:x']) assert.equal(cache.blocks[id], undefined);
+});
+
+test('reference preview narrows a labelled row, keeps the whole block on request, and strips labels', () => {
+  const note = Engine.parse('preview-rows.md', ['$$', '\\begin{align*}', 'a &= b \\label{first} \\\\', 'c &= d \\label{second}', '\\end{align*}', '$$', '', '$$\\eqref{first}\\ \\eqref{second}$$'].join('\n'));
+  const graph = Engine.graph([note]), eq = note.equations[0], resolve = (label: string) => graph.resolveLabel(label, note.path);
+  const first = Engine.previewTex(eq, 'first', true, resolve), second = Engine.previewTex(eq, 'second', true, resolve), whole = Engine.previewTex(eq, 'first', false, resolve);
+  assert.match(first, /a &= b/); assert.doesNotMatch(first, /c &= d/); assert.match(first, /\\tag\{1\}/);
+  assert.match(second, /c &= d/); assert.match(second, /\\tag\{2\}/);
+  assert.match(whole, /a &= b/); assert.match(whole, /c &= d/);
+  assert.match(Engine.previewTex(eq, 'block-id', true, resolve), /c &= d/);
+  assert.doesNotMatch(Engine.referenceTex('x\\label{a}', () => null), /\\label/);
+});
+
+test('a row preview keeps a trailing TeX comment from swallowing its generated tag', () => {
+  const note = Engine.parse('preview-comment.md', ['$$', '\\begin{align*}', 'a &= b \\label{first} % keep this comment', '\\\\', 'c &= d \\label{second}', '\\end{align*}', '$$', '', '$$\\eqref{first}$$'].join('\n'));
+  const graph = Engine.graph([note]), eq = note.equations[0], resolve = (label: string) => graph.resolveLabel(label, note.path);
+  const tex = Engine.previewTex(eq, 'first', true, resolve);
+  assert.match(tex, /a &= b/);
+  assert.match(tex, /% keep this comment\n\\tag\{1\}\n\\end\{align\*\}/);
+});
+
+test('native preview applies only to native block links, never to LaTeX-only references', () => {
+  const anchor = (label: string | undefined, href: string | undefined, target: string) => ({
+    dataset: { anEqref: label, anTarget: target, anSource: 'note.md' },
+    getAttribute: (name: string) => name === 'href' ? href : null,
+    closest: () => null
+  }) as any;
+  const theorem = { kind: 'theorem', depth: 1 } as any;
+  const plugin: any = { graph: { resolve: () => theorem, resolveLabel: () => theorem } };
+  const wiki = previewTarget(plugin, anchor(undefined, '#^thm-1', '#^thm-1'))!;
+  assert.equal(wiki.native, true); assert.equal(prefersNativePreview(wiki), true);
+  assert.equal(prefersNativePreview(wiki, false), false);
+  const latex = previewTarget(plugin, anchor('thm-1', undefined, 'thm-1'))!;
+  assert.equal(latex.native, false); assert.equal(prefersNativePreview(latex), false);
+  const colon = previewTarget(plugin, anchor(undefined, '#^thm:one', '#^thm:one'))!;
+  assert.equal(colon.native, false);
+  const nested = previewTarget({ graph: { resolve: () => ({ kind: 'theorem', depth: 2 }) } } as any, anchor(undefined, '#^lem', '#^lem'))!;
+  // Nested theorem-family blocks use the framed plugin card: native Page preview
+  // would keep their extra `>` prefixes and render blockquote bars.
+  assert.equal(nested.native, true); assert.equal(prefersNativePreview(nested), false);
+  for (const key of ['proof', 'definition', 'remark', 'observation']) {
+    const nestedKind = previewTarget({ graph: { resolve: () => ({ kind: 'theorem', key, depth: 2 }) } } as any, anchor(undefined, '#^nested', '#^nested'))!;
+    assert.equal(prefersNativePreview(nestedKind), false, key);
+  }
+  // A missing Page preview plugin is not the same as an unavailable registry.
+  const host = (internal: unknown) => ({ app: { internalPlugins: internal } } as any);
+  assert.equal(nativePreviewAvailable(host({ getPluginById: () => ({ enabled: false }) })), false);
+  assert.equal(nativePreviewAvailable(host({ getPluginById: () => null })), false);
+  assert.equal(nativePreviewAvailable(host({ getPluginById: () => ({ enabled: true }) })), true);
+  assert.equal(nativePreviewAvailable({ app: {} } as any), true);
+  const readingAnchor = { closest: () => null } as any;
+  const editingAnchor = { closest: (selector: string) => selector === '.cm-editor' ? {} : null } as any;
+  const pageHost = (options: Record<string, boolean>, sources?: Record<string, { defaultMod?: boolean }>) => ({
+    app: { internalPlugins: { getPluginById: () => ({ enabled: true, instance: { options } }) }, workspace: { hoverLinkSources: sources } }
+  } as any);
+  // Live Preview waits for Ctrl/Cmd; Reading view previews on plain hover by default.
+  assert.equal(nativePreviewRequiresModifier(pageHost({}), editingAnchor), true);
+  assert.equal(nativePreviewRequiresModifier(pageHost({ editor: false }), editingAnchor), false);
+  assert.equal(nativePreviewRequiresModifier(pageHost({}), readingAnchor), false);
+  assert.equal(nativePreviewRequiresModifier(pageHost({ preview: true }), readingAnchor), true);
+  assert.equal(nativePreviewRequiresModifier(pageHost({}, { preview: { defaultMod: false } }), readingAnchor), false);
+  assert.equal(nativePreviewRequiresModifier({ app: {} } as any, editingAnchor), true);
+  assert.equal(nativePreviewRequiresModifier({ app: {} } as any, readingAnchor), false);
+  // Plain hover keeps the plugin card when native preview needs a modifier.
+  assert.equal(prefersNativePreview(wiki, true, { requiredModifier: true, modifier: false }), false);
+  assert.equal(prefersNativePreview(wiki, true, { requiredModifier: true, modifier: true }), true);
+  assert.equal(prefersNativePreview(wiki, true, { requiredModifier: false, modifier: false }), true);
+  assert.equal(prefersNativePreview(wiki, false, { requiredModifier: false, modifier: true }), false);
+});
+
+test('an editor refresh survives a long IME composition and dispatches only the latest revision', async () => {
+  const plugin = new AcademicNotes(), dispatched: number[] = [];
+  plugin.active = true;
+  plugin.refreshEffect = { of: (revision: number) => revision } as any;
+  const view: any = { composing: true, compositionStarted: false, dispatch: (tr: any) => dispatched.push(tr.effects) };
+  plugin.editorViews.add(view);
+  const previous = (globalThis as any).window;
+  (globalThis as any).window = globalThis;
+  try {
+    plugin.refreshEditor(view, 1);
+    plugin.refreshEditor(view, 2);
+    await new Promise(resolve => setTimeout(resolve, 130));
+    view.composing = false;
+    await new Promise(resolve => setTimeout(resolve, 130));
+    assert.deepEqual(dispatched, [2]);
+  } finally {
+    plugin.active = false;
+    if (previous === undefined) delete (globalThis as any).window; else (globalThis as any).window = previous;
+  }
+});
+
+test('native block cache creation, reconciliation and host edits are safe', () => {
+  const source = '> [!thm] T ^title\n> body';
+  const note = Engine.parse('native-safe.md', source), cache: any = {}, save = { cache, entries: new Map() };
+  assert.equal(patchNativeBlocks(cache, note, save), true);
+  assert.equal(cache.blocks.title.position.start.line, 0);
+  // A host-side move is not mistaken for our patch and is left untouched.
+  cache.blocks.title.position.start.line = 7;
+  assert.equal(restoreNativeBlocks(save), false);
+  assert.equal(cache.blocks.title.position.start.line, 7);
+  // Removing the label restores the original position instead of leaving a stale range.
+  const original = '> [!thm] T\n> body ^title';
+  const clean: any = { blocks: { title: { id: 'title', position: { start: { line: 0, col: 0, offset: 0 }, end: { line: 1, col: 0, offset: 13 } } } } };
+  const cleanSave = { cache: clean, entries: new Map() }, cleanNote = Engine.parse('native-safe.md', original);
+  patchNativeBlocks(clean, cleanNote, cleanSave);
+  assert.equal(clean.blocks.title.anSynthetic, undefined);
+  patchNativeBlocks(clean, Engine.parse('native-safe.md', '> [!thm] T\n> body'), cleanSave);
+  assert.deepEqual(clean.blocks.title.position.start, { line: 0, col: 0, offset: 0 });
+  const ghostCache: any = {}, ghostNote = Engine.parse('ghost.md', '> [!thm] T ^ghost\n> body');
+  patchNativeBlocks(ghostCache, ghostNote, { cache: ghostCache, entries: new Map() });
+  assert.equal(ghostCache.blocks.ghost.anSynthetic, true);
+  assert.equal(Engine.parse('ghost.md', '> [!thm] T\n> body', ghostCache).blocks.has('ghost'), false);
+  assert.equal(patchNativeBlocks({} as any, Engine.parse('empty.md', 'plain text'), { cache: {} as any, entries: new Map() }), false);
+  const protoNote = Engine.parse('proto.md', ['$$', 'x \\label{__proto__}', '$$'].join('\n')), protoCache: any = {};
+  const protoSave = { cache: protoCache, entries: new Map() };
+  patchNativeBlocks(protoCache, protoNote, protoSave);
+  assert.equal(Object.hasOwn(protoCache.blocks, '__proto__'), true);
+  assert.equal(Object.getPrototypeOf(protoCache.blocks), Object.prototype);
+  restoreNativeBlocks(protoSave);
+  assert.equal(Object.hasOwn(protoCache.blocks, '__proto__'), false);
+  // Case-folded cache keys are different source IDs, not aliases.
+  const collisionSource = ['Ordinary paragraph. ^anchor', '', '$$', 'x=1 \\label{ANCHOR}', '$$'].join('\n');
+  const collisionNote = Engine.parse('case.md', collisionSource);
+  assert.equal(collisionNote.blocks.has('ANCHOR'), true);
+  const anchorPosition = { start: { line: 0, col: 0, offset: 0 }, end: { line: 0, col: 21, offset: 21 } };
+  const collisionCache: any = { blocks: { anchor: { id: 'anchor', position: anchorPosition } } };
+  patchNativeBlocks(collisionCache, collisionNote, { cache: collisionCache, entries: new Map() });
+  assert.deepEqual(collisionCache.blocks.anchor.position, anchorPosition);
+  assert.equal(Object.hasOwn(collisionCache.blocks, 'ANCHOR'), false);
+  // A host-owned object at the same coordinates is not deleted during restoration.
+  const replaceNote = Engine.parse('replace.md', '> [!thm] T ^replace\n> body');
+  const replaceCache: any = {}, replaceSave = { cache: replaceCache, entries: new Map() };
+  patchNativeBlocks(replaceCache, replaceNote, replaceSave);
+  const syntheticPosition = replaceCache.blocks.replace.position;
+  const hostEntry = { id: 'replace', position: { start: { ...syntheticPosition.start }, end: { ...syntheticPosition.end } } };
+  replaceCache.blocks.replace = hostEntry;
+  assert.equal(restoreNativeBlocks(replaceSave), false);
+  assert.equal(replaceCache.blocks.replace, hostEntry);
+  const adoptedCache: any = {}, adoptedSave = { cache: adoptedCache, entries: new Map() };
+  patchNativeBlocks(adoptedCache, replaceNote, adoptedSave);
+  const adoptedPosition = adoptedCache.blocks.replace.position;
+  const adoptedHost = { id: 'replace', position: { start: { ...adoptedPosition.start }, end: { ...adoptedPosition.end } } };
+  adoptedCache.blocks.replace = adoptedHost;
+  patchNativeBlocks(adoptedCache, replaceNote, adoptedSave);
+  restoreNativeBlocks(adoptedSave);
+  assert.equal(adoptedCache.blocks.replace, adoptedHost);
+  // A host block without a position is left exactly as Obsidian stored it.
+  const missing: any = { blocks: { title: { id: 'title' } } };
+  assert.equal(patchNativeBlocks(missing, Engine.parse('missing.md', source), { cache: missing, entries: new Map() }), false);
+  assert.equal(missing.blocks.title.position, undefined);
 });
 
 import './latex-integration';
