@@ -1,12 +1,16 @@
 import type { CachedMetadata, Pos } from 'obsidian';
 import type { ParsedNote, SourceRecord } from './engine';
 
+type BlockEntry = NonNullable<CachedMetadata['blocks']>[string];
+
 export interface NativeBlockEntry {
     existed: boolean;
     /** Position Obsidian owned before this plugin touched the block. */
     position?: Pos;
     /** Position written by this plugin; used to detect host-side changes. */
     patched?: Pos;
+    /** The exact object this patch wrote or adopted; detects replacement at the same position. */
+    object?: BlockEntry;
 }
 
 export interface NativeBlockSave {
@@ -37,19 +41,25 @@ export function nativeBlockSpan(note: ParsedNote, record: SourceRecord): Pos {
     };
 }
 
-function existingKey(blocks: Record<string, unknown>, id: string) {
-    if (Object.hasOwn(blocks, id)) return id;
+const exactKey = (blocks: Record<string, unknown>, id: string) => Object.hasOwn(blocks, id) ? id : undefined;
+/** Case-folded neighbours are different IDs; never rewrite one as another. */
+function foldedKey(blocks: Record<string, unknown>, id: string) {
     const lower = id.toLowerCase();
     return Object.keys(blocks).find(key => key.toLowerCase() === lower);
 }
 
-/** Undo one entry, unless the host has replaced our position in the meantime. */
+/** Undo one entry, unless the host has replaced our position or object in the meantime. */
 function restoreEntry(blocks: NonNullable<CachedMetadata['blocks']>, id: string, entry: NativeBlockEntry) {
-    const key = existingKey(blocks, id), current = key ? blocks[key] : undefined;
+    const key = exactKey(blocks, id), current = key ? blocks[key] : undefined;
     if (!key || !current || !current.position) return false;
+    // A new host-owned object at the same coordinates is still host-owned.
+    if (entry.object && entry.object !== current) return false;
     if (entry.patched && !same(current.position, entry.patched)) return false;
     if (!entry.existed) {
-        if (current.id === id || (typeof current.id === 'string' && current.id.toLowerCase() === id.toLowerCase())) {
+        // Only remove the synthetic object we created. If Obsidian replaced it
+        // in place or removed our marker, ownership has moved to the host.
+        if ((current as unknown as { anSynthetic?: boolean }).anSynthetic !== true) return false;
+        if (current.id === id) {
             delete blocks[key];
             return true;
         }
@@ -79,27 +89,32 @@ export function patchNativeBlocks(cache: CachedMetadata, note: ParsedNote, save:
     for (const [id, record] of note.blocks) {
         if (!record || record.line < 0 || record.endLine < record.line || record.endLine >= note.lines.length) continue;
         ids.add(id);
-        const key = existingKey(blocks, id), current = key ? blocks[key] : undefined;
+        const key = exactKey(blocks, id), current = key ? blocks[key] : undefined;
+        // A cache key that differs only by case belongs to another source ID.
+        // Do not redirect it to this record; the plugin card still covers it.
+        if (!key && foldedKey(blocks, id)) { save.entries.delete(id); continue; }
         // Some host entries legitimately have no position. There is no source
         // range to align and no original range to restore, so leave them alone
         // instead of inventing a position that unload could not remove.
         if (current && !current.position) { save.entries.delete(id); continue; }
         if (!save.entries.has(id)) {
-            save.entries.set(id, current ? { existed: true, position: { start: copy(current.position.start), end: copy(current.position.end) } } : { existed: false });
+            save.entries.set(id, current ? { existed: true, position: { start: copy(current.position.start), end: copy(current.position.end) }, object: current } : { existed: false });
         }
         const entry = save.entries.get(id)!, span = nativeBlockSpan(note, record);
         // If the host moved or re-created the entry since our last write, treat
         // its current position as the new original instead of restoring stale data.
-        if (entry.patched && current && !same(current.position, entry.patched)) {
+        if (entry.patched && current && (entry.object !== current || !same(current.position, entry.patched))) {
             entry.existed = true;
             entry.position = { start: copy(current.position.start), end: copy(current.position.end) };
+            entry.object = current;
             delete (current as unknown as { anSynthetic?: boolean }).anSynthetic;
         }
         // The host removed an entry we had aligned. If we re-create it now,
         // Obsidian did not own it at unload time, so do not restore a ghost.
-        else if (entry.patched && !current) entry.existed = false;
+        else if (entry.patched && !current) { entry.existed = false; entry.object = undefined; }
         entry.patched = { start: copy(span.start), end: copy(span.end) };
         if (current) {
+            entry.object = current;
             if (current.position.start.line !== span.start.line || current.position.start.col !== span.start.col || current.position.start.offset !== span.start.offset
                 || current.position.end.line !== span.end.line || current.position.end.col !== span.end.col || current.position.end.offset !== span.end.offset) {
                 assign(current.position.start, span.start);
@@ -110,11 +125,13 @@ export function patchNativeBlocks(cache: CachedMetadata, note: ParsedNote, save:
         else {
             // defineProperty, not assignment: a label literally named
             // "__proto__" must not mutate the cache object's prototype.
-            Object.defineProperty(blocks, id, { value: { id, position: { start: copy(span.start), end: copy(span.end) } }, enumerable: true, configurable: true, writable: true });
+            const created: BlockEntry = { id, position: { start: copy(span.start), end: copy(span.end) } };
+            Object.defineProperty(blocks, id, { value: created, enumerable: true, configurable: true, writable: true });
             // The parser will bind this ID from source while the marker exists.
             // Marking it keeps Obsidian's stale cache from resurrecting a label
             // that the user already removed from the note.
-            (blocks[id] as unknown as { anSynthetic?: boolean }).anSynthetic = true;
+            (created as unknown as { anSynthetic?: boolean }).anSynthetic = true;
+            entry.object = created;
             changed = true;
         }
     }

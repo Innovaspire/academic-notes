@@ -66996,19 +66996,35 @@ var RenameReferenceModal = class extends import_obsidian3.Modal {
 };
 
 // src/ui/reference-preview.ts
-function nativePreviewAvailable(plugin) {
+function pagePreviewHost(plugin) {
   try {
     const internal = plugin.app?.internalPlugins;
-    if (!internal || typeof internal.getPluginById !== "function") return true;
-    const preview = internal.getPluginById("page-preview");
-    return preview ? preview.enabled !== false : false;
+    if (!internal || typeof internal.getPluginById !== "function") return void 0;
+    return internal.getPluginById("page-preview");
   } catch {
-    return true;
+    return void 0;
   }
 }
-function prefersNativePreview(target, nativeAvailable = true) {
+function nativePreviewAvailable(plugin) {
+  const host = pagePreviewHost(plugin);
+  return host === void 0 ? true : host ? host.enabled !== false : false;
+}
+function nativePreviewRequiresModifier(plugin, anchor) {
+  const editing = !!anchor.closest?.(".cm-editor"), source = editing ? "editor" : "preview";
+  const host = pagePreviewHost(plugin), option = host?.instance?.options?.[source];
+  if (typeof option === "boolean") return option;
+  try {
+    const sources = plugin.app.workspace?.hoverLinkSources;
+    const fallback = sources?.[source]?.defaultMod;
+    if (typeof fallback === "boolean") return fallback;
+  } catch {
+  }
+  return editing;
+}
+function prefersNativePreview(target, nativeAvailable = true, interaction) {
   const { record } = target;
-  return nativeAvailable && target.native && (!!record.diagram || record.kind === "theorem" && record.depth === 1 || ["figure", "subfigure", "table", "algorithm"].includes(record.kind));
+  const modifierReady = !interaction || !interaction.requiredModifier || interaction.modifier;
+  return nativeAvailable && modifierReady && target.native && (!!record.diagram || record.kind === "theorem" && record.depth === 1 || ["figure", "subfigure", "table", "algorithm"].includes(record.kind));
 }
 function previewTarget(plugin, anchor) {
   const label3 = anchor.dataset.anEqref, path = anchor.dataset.anSource || anchor.closest("[data-an-path]")?.dataset.anPath;
@@ -67115,13 +67131,13 @@ var ReferencePreviews = class {
       if (!plugin.settings.referencePreview) return;
       const anchor = this.find(event.target);
       if (!anchor || anchor.closest(".an-reference-popover")) return;
-      const target = previewTarget(plugin, anchor);
-      if (!target || prefersNativePreview(target, nativePreviewAvailable(plugin))) return;
+      const target = previewTarget(plugin, anchor), interaction = { requiredModifier: nativePreviewRequiresModifier(plugin, anchor), modifier: event.ctrlKey || event.metaKey };
+      if (!target || prefersNativePreview(target, nativePreviewAvailable(plugin), interaction)) return;
       event.stopPropagation();
     }, true);
     plugin.registerDomEvent(doc, "pointerover", (event) => {
       if (event.pointerType === "touch") return;
-      this.enter(event.target);
+      this.enter(event.target, false, event.ctrlKey || event.metaKey);
     });
     plugin.registerDomEvent(doc, "focusin", (event) => this.enter(event.target, true));
     plugin.registerDomEvent(doc, "pointerout", (event) => this.leave(event.relatedTarget));
@@ -67154,21 +67170,30 @@ var ReferencePreviews = class {
       modal.open();
     }, true);
     plugin.registerDomEvent(doc, "keydown", (event) => {
-      if (event.key === "Escape") this.hide(true);
-      else if (event.key === "Enter" && this.find(event.target)) this.hide();
+      if (event.key === "Escape") {
+        this.hide(true);
+        return;
+      }
+      if (event.key === "Enter") {
+        if (this.find(event.target)) this.hide();
+        return;
+      }
+      if (!this.card || !this.anchor || !event.ctrlKey && !event.metaKey) return;
+      const target = previewTarget(plugin, this.anchor);
+      if (target && prefersNativePreview(target, nativePreviewAvailable(plugin), { requiredModifier: nativePreviewRequiresModifier(plugin, this.anchor), modifier: true })) this.hide();
     }, true);
     plugin.register(() => this.destroy());
   }
   find(node) {
     return node?.closest?.("a[data-an-target],a[data-an-eqref]") || null;
   }
-  enter(node, focused = false) {
+  enter(node, focused = false, modifier = false) {
     if (this.restoringFocus || !this.plugin.settings.referencePreview || node?.closest(".an-reference-preview")) return;
     const anchor = this.find(node);
     if (!anchor || anchor === this.anchor && this.card) return;
     this.clear();
     this.timer = this.doc.defaultView.setTimeout(() => {
-      if (anchor.isConnected) this.show(anchor, focused);
+      if (anchor.isConnected) this.show(anchor, focused, modifier);
     }, 250);
   }
   leave(next) {
@@ -67183,9 +67208,9 @@ var ReferencePreviews = class {
     if (this.timer !== void 0) this.doc.defaultView.clearTimeout(this.timer);
     this.timer = void 0;
   }
-  show(anchor, focused = false) {
+  show(anchor, focused = false, modifier = false) {
     const target = previewTarget(this.plugin, anchor);
-    if (!target || !focused && prefersNativePreview(target, nativePreviewAvailable(this.plugin))) {
+    if (!target || !focused && prefersNativePreview(target, nativePreviewAvailable(this.plugin), { requiredModifier: nativePreviewRequiresModifier(this.plugin, anchor), modifier })) {
       this.hide();
       return;
     }
@@ -67238,17 +67263,19 @@ function nativeBlockSpan(note, record) {
     end: { line: endLine, col: note.lines[endLine].length, offset: note.starts[endLine] + note.lines[endLine].length }
   };
 }
-function existingKey(blocks, id2) {
-  if (Object.hasOwn(blocks, id2)) return id2;
+var exactKey = (blocks, id2) => Object.hasOwn(blocks, id2) ? id2 : void 0;
+function foldedKey(blocks, id2) {
   const lower = id2.toLowerCase();
   return Object.keys(blocks).find((key2) => key2.toLowerCase() === lower);
 }
 function restoreEntry(blocks, id2, entry) {
-  const key2 = existingKey(blocks, id2), current2 = key2 ? blocks[key2] : void 0;
+  const key2 = exactKey(blocks, id2), current2 = key2 ? blocks[key2] : void 0;
   if (!key2 || !current2 || !current2.position) return false;
+  if (entry.object && entry.object !== current2) return false;
   if (entry.patched && !same(current2.position, entry.patched)) return false;
   if (!entry.existed) {
-    if (current2.id === id2 || typeof current2.id === "string" && current2.id.toLowerCase() === id2.toLowerCase()) {
+    if (current2.anSynthetic !== true) return false;
+    if (current2.id === id2) {
       delete blocks[key2];
       return true;
     }
@@ -67275,30 +67302,41 @@ function patchNativeBlocks(cache, note, save) {
   for (const [id2, record] of note.blocks) {
     if (!record || record.line < 0 || record.endLine < record.line || record.endLine >= note.lines.length) continue;
     ids.add(id2);
-    const key2 = existingKey(blocks, id2), current2 = key2 ? blocks[key2] : void 0;
+    const key2 = exactKey(blocks, id2), current2 = key2 ? blocks[key2] : void 0;
+    if (!key2 && foldedKey(blocks, id2)) {
+      save.entries.delete(id2);
+      continue;
+    }
     if (current2 && !current2.position) {
       save.entries.delete(id2);
       continue;
     }
     if (!save.entries.has(id2)) {
-      save.entries.set(id2, current2 ? { existed: true, position: { start: copy(current2.position.start), end: copy(current2.position.end) } } : { existed: false });
+      save.entries.set(id2, current2 ? { existed: true, position: { start: copy(current2.position.start), end: copy(current2.position.end) }, object: current2 } : { existed: false });
     }
     const entry = save.entries.get(id2), span = nativeBlockSpan(note, record);
-    if (entry.patched && current2 && !same(current2.position, entry.patched)) {
+    if (entry.patched && current2 && (entry.object !== current2 || !same(current2.position, entry.patched))) {
       entry.existed = true;
       entry.position = { start: copy(current2.position.start), end: copy(current2.position.end) };
+      entry.object = current2;
       delete current2.anSynthetic;
-    } else if (entry.patched && !current2) entry.existed = false;
+    } else if (entry.patched && !current2) {
+      entry.existed = false;
+      entry.object = void 0;
+    }
     entry.patched = { start: copy(span.start), end: copy(span.end) };
     if (current2) {
+      entry.object = current2;
       if (current2.position.start.line !== span.start.line || current2.position.start.col !== span.start.col || current2.position.start.offset !== span.start.offset || current2.position.end.line !== span.end.line || current2.position.end.col !== span.end.col || current2.position.end.offset !== span.end.offset) {
         assign2(current2.position.start, span.start);
         assign2(current2.position.end, span.end);
         changed = true;
       }
     } else {
-      Object.defineProperty(blocks, id2, { value: { id: id2, position: { start: copy(span.start), end: copy(span.end) } }, enumerable: true, configurable: true, writable: true });
-      blocks[id2].anSynthetic = true;
+      const created = { id: id2, position: { start: copy(span.start), end: copy(span.end) } };
+      Object.defineProperty(blocks, id2, { value: created, enumerable: true, configurable: true, writable: true });
+      created.anSynthetic = true;
+      entry.object = created;
       changed = true;
     }
   }

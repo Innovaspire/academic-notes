@@ -7,6 +7,8 @@
 - Point Obsidian's Page preview and block navigation at the nested block's own source range: hovering a lemma or equation now shows that environment instead of the enclosing theorem. Title-line, standalone quoted and equation-label IDs are exposed to Obsidian's metadata cache, so native click and hover use the labelled block rather than the outer callout. Media blocks keep the native preview so images and diagrams still render.
 - Keep top-level theorem-family and media blocks on Obsidian's native preview so their callout frame and rendered content match the page. Nested theorem-family callouts use the plugin card, which now recreates the callout frame: native Page preview preserves every `>` prefix and renders a nested block as extra blockquote bars. LaTeX-only references, non-native IDs and previews with Page preview disabled also use the plugin card; the card no longer prints the raw `^id` line, strips `\label` before MathJax, and resolves `\eqref` against the current graph.
 - Add a temporary “multi-line equation preview shows only the labelled row” switch (on by default) next to the reference-preview setting. It applies when the reference targets one row of an `align`-style environment and falls back to the whole block for unlabelled or unnumbered targets; the original author can move or rename it.
+- Keep native block-cache ownership exact: case-folded IDs are never redirected to another source block, and host-owned entries replaced at identical coordinates survive plugin unload.
+- Keep the plugin reference card on plain hover when Page preview requires Ctrl/Cmd, while retaining native preview for modifier hover.
 
 ## 2.15.6 — 2026-10-29
 

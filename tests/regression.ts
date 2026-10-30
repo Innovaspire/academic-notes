@@ -28,7 +28,7 @@ import { mathContinuationLines } from '../src/typography/continuations';
 import { proseLines } from '../src/typography/prose';
 import { labelInsertion } from '../src/workspace/notes';
 import { nativeBlockSpan, patchNativeBlocks, restoreNativeBlocks } from '../src/indexing/native-blocks';
-import { previewTarget, prefersNativePreview, nativePreviewAvailable } from '../src/ui/reference-preview';
+import { previewTarget, prefersNativePreview, nativePreviewAvailable, nativePreviewRequiresModifier } from '../src/ui/reference-preview';
 import { EditorState } from '@codemirror/state';
 
 test('visual prose indentation excludes Markdown structures and detects paragraph starts', () => {
@@ -999,6 +999,24 @@ test('native preview applies only to native block links, never to LaTeX-only ref
   assert.equal(nativePreviewAvailable(host({ getPluginById: () => null })), false);
   assert.equal(nativePreviewAvailable(host({ getPluginById: () => ({ enabled: true }) })), true);
   assert.equal(nativePreviewAvailable({ app: {} } as any), true);
+  const readingAnchor = { closest: () => null } as any;
+  const editingAnchor = { closest: (selector: string) => selector === '.cm-editor' ? {} : null } as any;
+  const pageHost = (options: Record<string, boolean>, sources?: Record<string, { defaultMod?: boolean }>) => ({
+    app: { internalPlugins: { getPluginById: () => ({ enabled: true, instance: { options } }) }, workspace: { hoverLinkSources: sources } }
+  } as any);
+  // Live Preview waits for Ctrl/Cmd; Reading view previews on plain hover by default.
+  assert.equal(nativePreviewRequiresModifier(pageHost({}), editingAnchor), true);
+  assert.equal(nativePreviewRequiresModifier(pageHost({ editor: false }), editingAnchor), false);
+  assert.equal(nativePreviewRequiresModifier(pageHost({}), readingAnchor), false);
+  assert.equal(nativePreviewRequiresModifier(pageHost({ preview: true }), readingAnchor), true);
+  assert.equal(nativePreviewRequiresModifier(pageHost({}, { preview: { defaultMod: false } }), readingAnchor), false);
+  assert.equal(nativePreviewRequiresModifier({ app: {} } as any, editingAnchor), true);
+  assert.equal(nativePreviewRequiresModifier({ app: {} } as any, readingAnchor), false);
+  // Plain hover keeps the plugin card when native preview needs a modifier.
+  assert.equal(prefersNativePreview(wiki, true, { requiredModifier: true, modifier: false }), false);
+  assert.equal(prefersNativePreview(wiki, true, { requiredModifier: true, modifier: true }), true);
+  assert.equal(prefersNativePreview(wiki, true, { requiredModifier: false, modifier: false }), true);
+  assert.equal(prefersNativePreview(wiki, false, { requiredModifier: false, modifier: true }), false);
 });
 
 test('an editor refresh survives a long IME composition and dispatches only the latest revision', async () => {
@@ -1051,6 +1069,32 @@ test('native block cache creation, reconciliation and host edits are safe', () =
   assert.equal(Object.getPrototypeOf(protoCache.blocks), Object.prototype);
   restoreNativeBlocks(protoSave);
   assert.equal(Object.hasOwn(protoCache.blocks, '__proto__'), false);
+  // Case-folded cache keys are different source IDs, not aliases.
+  const collisionSource = ['Ordinary paragraph. ^anchor', '', '$$', 'x=1 \\label{ANCHOR}', '$$'].join('\n');
+  const collisionNote = Engine.parse('case.md', collisionSource);
+  assert.equal(collisionNote.blocks.has('ANCHOR'), true);
+  const anchorPosition = { start: { line: 0, col: 0, offset: 0 }, end: { line: 0, col: 21, offset: 21 } };
+  const collisionCache: any = { blocks: { anchor: { id: 'anchor', position: anchorPosition } } };
+  patchNativeBlocks(collisionCache, collisionNote, { cache: collisionCache, entries: new Map() });
+  assert.deepEqual(collisionCache.blocks.anchor.position, anchorPosition);
+  assert.equal(Object.hasOwn(collisionCache.blocks, 'ANCHOR'), false);
+  // A host-owned object at the same coordinates is not deleted during restoration.
+  const replaceNote = Engine.parse('replace.md', '> [!thm] T ^replace\n> body');
+  const replaceCache: any = {}, replaceSave = { cache: replaceCache, entries: new Map() };
+  patchNativeBlocks(replaceCache, replaceNote, replaceSave);
+  const syntheticPosition = replaceCache.blocks.replace.position;
+  const hostEntry = { id: 'replace', position: { start: { ...syntheticPosition.start }, end: { ...syntheticPosition.end } } };
+  replaceCache.blocks.replace = hostEntry;
+  assert.equal(restoreNativeBlocks(replaceSave), false);
+  assert.equal(replaceCache.blocks.replace, hostEntry);
+  const adoptedCache: any = {}, adoptedSave = { cache: adoptedCache, entries: new Map() };
+  patchNativeBlocks(adoptedCache, replaceNote, adoptedSave);
+  const adoptedPosition = adoptedCache.blocks.replace.position;
+  const adoptedHost = { id: 'replace', position: { start: { ...adoptedPosition.start }, end: { ...adoptedPosition.end } } };
+  adoptedCache.blocks.replace = adoptedHost;
+  patchNativeBlocks(adoptedCache, replaceNote, adoptedSave);
+  restoreNativeBlocks(adoptedSave);
+  assert.equal(adoptedCache.blocks.replace, adoptedHost);
   // A host block without a position is left exactly as Obsidian stored it.
   const missing: any = { blocks: { title: { id: 'title' } } };
   assert.equal(patchNativeBlocks(missing, Engine.parse('missing.md', source), { cache: missing, entries: new Map() }), false);

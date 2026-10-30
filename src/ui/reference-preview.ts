@@ -5,24 +5,45 @@ import { titleInk } from '../rendering/custom-appearance';
 import { t } from '../i18n';
 import { RenameReferenceModal } from './rename-reference';
 export interface PreviewTarget { record: SourceRecord; label: string; /** Link has an href Obsidian can preview natively. */ native: boolean }
-/** Page preview is a core plugin and can be disabled or absent; keep the plugin card as fallback. */
-export function nativePreviewAvailable(plugin: AcademicNotes) {
+export interface NativePreviewInteraction { requiredModifier: boolean; modifier: boolean }
+type PagePreviewHost = { enabled?: boolean; instance?: { options?: Record<string, boolean> } };
+/** The internal wrapper shape is stable enough to read enabled/options, but must stay optional. */
+function pagePreviewHost(plugin: AcademicNotes): PagePreviewHost | null | undefined {
     try {
-        const internal = (plugin.app as unknown as { internalPlugins?: { getPluginById?: (id: string) => { enabled?: boolean } | null } } | undefined)?.internalPlugins;
+        const internal = (plugin.app as unknown as { internalPlugins?: { getPluginById?: (id: string) => PagePreviewHost | null } } | undefined)?.internalPlugins;
         // Very old hosts do not expose the internal-plugin registry; assume the
         // core preview still works there and let Obsidian decide.
-        if (!internal || typeof internal.getPluginById !== 'function') return true;
-        const preview = internal.getPluginById('page-preview');
-        return preview ? preview.enabled !== false : false;
+        if (!internal || typeof internal.getPluginById !== 'function') return undefined;
+        return internal.getPluginById('page-preview');
     }
-    catch { return true; }
+    catch { return undefined; }
+}
+/** Page preview is a core plugin and can be disabled or absent; keep the plugin card as fallback. */
+export function nativePreviewAvailable(plugin: AcademicNotes) {
+    const host = pagePreviewHost(plugin);
+    return host === undefined ? true : host ? host.enabled !== false : false;
+}
+/** Whether the current hover source needs Ctrl/Cmd before Page preview opens. */
+export function nativePreviewRequiresModifier(plugin: AcademicNotes, anchor: HTMLElement) {
+    const editing = !!anchor.closest?.('.cm-editor'), source = editing ? 'editor' : 'preview';
+    const host = pagePreviewHost(plugin), option = host?.instance?.options?.[source];
+    if (typeof option === 'boolean') return option;
+    try {
+        const sources = (plugin.app as unknown as { workspace?: { hoverLinkSources?: Record<string, { defaultMod?: boolean }> } }).workspace?.hoverLinkSources;
+        const fallback = sources?.[source]?.defaultMod;
+        if (typeof fallback === 'boolean') return fallback;
+    }
+    catch { /* Fall back to Obsidian's documented source defaults. */ }
+    // Editing view requires Ctrl/Cmd; Reading view normally previews on plain hover.
+    return editing;
 }
 /** Top-level theorem-family and media blocks render from source in Obsidian's Page preview. */
-export function prefersNativePreview(target: PreviewTarget, nativeAvailable = true) {
+export function prefersNativePreview(target: PreviewTarget, nativeAvailable = true, interaction?: NativePreviewInteraction) {
     const { record } = target;
     // A LaTeX \eqref anchor deliberately has no href and is only rendered by
     // the plugin; letting it fall through to native Page preview would show nothing.
-    return nativeAvailable && target.native && (!!record.diagram || (record.kind === 'theorem' && record.depth === 1) || ['figure', 'subfigure', 'table', 'algorithm'].includes(record.kind));
+    const modifierReady = !interaction || !interaction.requiredModifier || interaction.modifier;
+    return nativeAvailable && modifierReady && target.native && (!!record.diagram || (record.kind === 'theorem' && record.depth === 1) || ['figure', 'subfigure', 'table', 'algorithm'].includes(record.kind));
 }
 export function previewTarget(plugin: AcademicNotes, anchor: HTMLElement): PreviewTarget | null {
     const label=anchor.dataset.anEqref, path=anchor.dataset.anSource || anchor.closest<HTMLElement>('[data-an-path]')?.dataset.anPath;
@@ -123,11 +144,11 @@ export class ReferencePreviews {
             if(!plugin.settings.referencePreview)return;
             const anchor=this.find(event.target as Element | null);
             if(!anchor || anchor.closest('.an-reference-popover'))return;
-            const target=previewTarget(plugin,anchor);
-            if(!target || prefersNativePreview(target,nativePreviewAvailable(plugin)))return;
+            const target=previewTarget(plugin,anchor), interaction={requiredModifier:nativePreviewRequiresModifier(plugin,anchor),modifier:event.ctrlKey||event.metaKey};
+            if(!target || prefersNativePreview(target,nativePreviewAvailable(plugin),interaction))return;
             event.stopPropagation();
         },true);
-        plugin.registerDomEvent(doc,'pointerover',event=>{if(event.pointerType==='touch')return;this.enter(event.target as Element | null);});
+        plugin.registerDomEvent(doc,'pointerover',event=>{if(event.pointerType==='touch')return;this.enter(event.target as Element | null,false,event.ctrlKey||event.metaKey);});
         plugin.registerDomEvent(doc,'focusin',event=>this.enter(event.target as Element | null,true));
         plugin.registerDomEvent(doc,'pointerout',event=>this.leave(event.relatedTarget as Node | null));
         plugin.registerDomEvent(doc,'focusout',event=>this.leave(event.relatedTarget as Node | null));
@@ -145,25 +166,34 @@ export class ReferencePreviews {
             catch(error) { plugin.recordError(t('引用内容预览'),error); modal.close(); return; }
             modal.onClose=()=>{if(this.modal===modal)this.modal=undefined;};modal.open();
         },true);
-        plugin.registerDomEvent(doc,'keydown',event=>{if(event.key==='Escape')this.hide(true);else if(event.key==='Enter'&&this.find(event.target as Element | null))this.hide();},true);
+        plugin.registerDomEvent(doc,'keydown',event=>{
+            if(event.key==='Escape'){this.hide(true);return;}
+            if(event.key==='Enter'){if(this.find(event.target as Element | null))this.hide();return;}
+            // Pressing Mod while a pointer preview is open hands the hover to
+            // native Page preview; otherwise both popovers would be visible.
+            if(!this.card || !this.anchor || (!event.ctrlKey && !event.metaKey))return;
+            const target=previewTarget(plugin,this.anchor);
+            if(target && prefersNativePreview(target,nativePreviewAvailable(plugin),{requiredModifier:nativePreviewRequiresModifier(plugin,this.anchor),modifier:true}))this.hide();
+        },true);
         plugin.register(()=>this.destroy());
     }
     private find(node: Element | null) { return node?.closest?.<HTMLElement>('a[data-an-target],a[data-an-eqref]') || null; }
-    private enter(node: Element | null, focused=false) {
+    private enter(node: Element | null, focused=false, modifier=false) {
         if(this.restoringFocus || !this.plugin.settings.referencePreview || node?.closest('.an-reference-preview'))return;
         const anchor=this.find(node);if(!anchor || anchor===this.anchor && this.card)return;
-        this.clear();this.timer=this.doc.defaultView!.setTimeout(()=>{if(anchor.isConnected)this.show(anchor,focused);},250);
+        this.clear();this.timer=this.doc.defaultView!.setTimeout(()=>{if(anchor.isConnected)this.show(anchor,focused,modifier);},250);
     }
     private leave(next: Node | null) {
         if(next && (this.anchor?.contains(next)||this.card?.contains(next))) {this.clear();return;}
         this.clear();this.timer=this.doc.defaultView!.setTimeout(()=>this.hide(),180);
     }
     private clear() {if(this.timer!==undefined)this.doc.defaultView!.clearTimeout(this.timer);this.timer=undefined;}
-    show(anchor: HTMLElement, focused=false) {
+    show(anchor: HTMLElement, focused=false, modifier=false) {
         const target=previewTarget(this.plugin,anchor);
         // Page preview is a pointer affordance; keyboard focus still gets the
-        // plugin card so focus-only users keep the documented preview.
-        if(!target || !focused && prefersNativePreview(target,nativePreviewAvailable(this.plugin))){this.hide();return;}
+        // plugin card so focus-only users keep the documented preview. In an
+        // editor Page preview waits for Ctrl/Cmd, so plain hover keeps the card.
+        if(!target || !focused && prefersNativePreview(target,nativePreviewAvailable(this.plugin),{requiredModifier:nativePreviewRequiresModifier(this.plugin,anchor),modifier})){this.hide();return;}
         this.hide();this.anchor=anchor;
         const card=this.doc.body.createDiv({cls:'an-reference-popover',attr:{role:'dialog','aria-label':t('引用内容预览')}});this.card=card;
         try { renderReferencePreview(this.plugin,card,target,()=>this.hide(true)); }
